@@ -1,0 +1,13 @@
+# Document Management System Requirements
+# PyQt6 for GUI
+PyQt6>=6.6.0
+
+# Image processing
+Pillow>=10.0.0
+
+# OCR (Optical Character Recognition)
+easyocr>=1.7.0
+
+# Supporting libraries (included with easyocr)
+torch>=2.0.0
+numpy>=1.24.0
