@@ -11,3 +11,6 @@ easyocr>=1.7.0
 # Supporting libraries (included with easyocr)
 torch>=2.0.0
 numpy>=1.24.0
+
+# Scanner support (Windows only)
+pywin32>=306

@@ -1,6 +1,8 @@
 import sys
 import os
+import tempfile
 from pathlib import Path
+from datetime import datetime
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QTableWidget, 
     QTableWidgetItem, QPushButton, QLineEdit, QLabel, QFileDialog,
@@ -14,6 +16,22 @@ from PyQt6.QtWidgets import QApplication
 
 # إضافة المسارات
 sys.path.insert(0, str(Path(__file__).parent / 'src'))
+
+# التحقق من توفر مكتبة السكانر
+SCANNER_AVAILABLE = False
+SCANNER_COUNT = 0
+try:
+    import win32com.client
+    SCANNER_AVAILABLE = True
+    # التحقق من عدد السكانرات المتصلة
+    try:
+        _wia_manager = win32com.client.Dispatch("WIA.DeviceManager")
+        SCANNER_COUNT = _wia_manager.DeviceInfos.Count
+    except:
+        SCANNER_COUNT = 0
+except ImportError:
+    SCANNER_AVAILABLE = False
+    SCANNER_COUNT = 0
 
 from database.db_manager import DatabaseManager
 from app.filename_parser import FilenameParser, ImageSequenceHandler
@@ -356,6 +374,11 @@ class AddDocumentDialog(QDialog):
         self.images_label = QLabel('عدد الصور الممسوحة: 0')
         layout.addRow(self.images_label)
         
+        # حالة السكانر (Disclaimer)
+        self.scanner_status_label = QLabel()
+        self._update_scanner_status()
+        layout.addRow(self.scanner_status_label)
+        
         # أزرار المسح
         scan_layout = QHBoxLayout()
         
@@ -381,13 +404,64 @@ class AddDocumentDialog(QDialog):
         
         self.setLayout(layout)
     
+    def _update_scanner_status(self):
+        """تحديث حالة السكانر في الواجهة"""
+        global SCANNER_AVAILABLE, SCANNER_COUNT
+        
+        # إعادة التحقق من السكانرات المتصلة
+        if SCANNER_AVAILABLE:
+            try:
+                _wia_manager = win32com.client.Dispatch("WIA.DeviceManager")
+                SCANNER_COUNT = _wia_manager.DeviceInfos.Count
+            except:
+                SCANNER_COUNT = 0
+        
+        if not SCANNER_AVAILABLE:
+            self.scanner_status_label.setText('⚠️ حالة السكانر: مكتبة pywin32 غير مثبتة - استخدم اختيار الصور من الحاسب')
+            self.scanner_status_label.setStyleSheet('color: #e74c3c; font-size: 11px; padding: 5px; background-color: #fdf2f2; border-radius: 3px;')
+        elif SCANNER_COUNT == 0:
+            self.scanner_status_label.setText('⚠️ حالة السكانر: لا يوجد سكانر متصل - قم بتوصيل السكانر أو اختر صورة من الحاسب')
+            self.scanner_status_label.setStyleSheet('color: #e67e22; font-size: 11px; padding: 5px; background-color: #fef9e7; border-radius: 3px;')
+        else:
+            self.scanner_status_label.setText(f'✅ حالة السكانر: متصل ({SCANNER_COUNT} جهاز)')
+            self.scanner_status_label.setStyleSheet('color: #27ae60; font-size: 11px; padding: 5px; background-color: #eafaf1; border-radius: 3px;')
+    
     def scan_manual(self):
         """مسح من السكانر مع إدخال يدوي (سريع)"""
+        global SCANNER_AVAILABLE, SCANNER_COUNT
+        
+        # التحقق من توفر المكتبة
+        if not SCANNER_AVAILABLE:
+            reply = QMessageBox.question(
+                self, 'السكانر غير متاح',
+                '⚠️ مكتبة السكانر (pywin32) غير مثبتة\n\n'
+                'لتثبيتها، قم بتشغيل الأمر التالي:\n'
+                'pip install pywin32\n\n'
+                'هل تريد اختيار صورة من الحاسب بدلاً من المسح؟',
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            if reply == QMessageBox.StandardButton.Yes:
+                self._select_image_file()
+            return
+        
+        # التحقق من وجود سكانر متصل
+        self._update_scanner_status()
+        if SCANNER_COUNT == 0:
+            reply = QMessageBox.question(
+                self, 'السكانر غير متصل',
+                '⚠️ لا يوجد سكانر متصل بالحاسب\n\n'
+                'تأكد من:\n'
+                '• توصيل السكانر بالحاسب\n'
+                '• تشغيل السكانر\n'
+                '• تثبيت برنامج تشغيل السكانر\n\n'
+                'هل تريد اختيار صورة من الحاسب بدلاً من المسح؟',
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            if reply == QMessageBox.StandardButton.Yes:
+                self._select_image_file()
+            return
+        
         try:
-            import win32com.client
-            import tempfile
-            from datetime import datetime
-            
             QMessageBox.information(
                 self, 'جاري المسح',
                 'سيتم فتح نافذة السكانر\n\nضع الوثيقة واضغط Scan'
@@ -431,13 +505,78 @@ class AddDocumentDialog(QDialog):
                 f'خطأ في المسح الضوئي:\n{str(e)}\n\nتأكد من:\n• توصيل السكانر\n• تثبيت برنامج السكانر'
             )
     
+    def _select_image_file(self):
+        """اختيار صورة من الحاسب كبديل للسكانر"""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, 'اختر صورة الوثيقة',
+            '', 'صور (*.jpg *.jpeg *.png *.tiff *.bmp);;جميع الملفات (*)'
+        )
+        
+        if file_path:
+            self.scanned_image_path = file_path
+            self.scanned_images = [file_path]
+            self._update_images_count()
+            QMessageBox.information(
+                self, 'تم ✅',
+                'تم اختيار الصورة بنجاح!\n\nأدخل المعلومات يدوياً في الحقول أدناه'
+            )
+    
+    def _select_multiple_image_files(self):
+        """اختيار عدة صور من الحاسب كبديل للسكانر"""
+        files, _ = QFileDialog.getOpenFileNames(
+            self, 'اختر صور الوثائق',
+            '', 'صور (*.jpg *.jpeg *.png *.tiff *.bmp);;جميع الملفات (*)'
+        )
+        
+        if files:
+            self.scanned_images = files
+            self.scanned_image_path = files[0] if files else None
+            self._update_images_count()
+            
+            if len(files) > 1:
+                self._handle_scanned_documents(len(files))
+            else:
+                QMessageBox.information(
+                    self, 'تم ✅',
+                    'تم اختيار الصورة بنجاح!\n\nأدخل المعلومات يدوياً في الحقول أدناه'
+                )
+    
     def scan_multiple(self):
         """مسح تلقائي لجميع الأوراق دفعة واحدة"""
+        global SCANNER_AVAILABLE, SCANNER_COUNT
+        
+        # التحقق من توفر المكتبة
+        if not SCANNER_AVAILABLE:
+            reply = QMessageBox.question(
+                self, 'السكانر غير متاح',
+                '⚠️ مكتبة السكانر (pywin32) غير مثبتة\n\n'
+                'لتثبيتها، قم بتشغيل الأمر التالي:\n'
+                'pip install pywin32\n\n'
+                'هل تريد اختيار عدة صور من الحاسب بدلاً من المسح؟',
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            if reply == QMessageBox.StandardButton.Yes:
+                self._select_multiple_image_files()
+            return
+        
+        # التحقق من وجود سكانر متصل
+        self._update_scanner_status()
+        if SCANNER_COUNT == 0:
+            reply = QMessageBox.question(
+                self, 'السكانر غير متصل',
+                '⚠️ لا يوجد سكانر متصل بالحاسب\n\n'
+                'تأكد من:\n'
+                '• توصيل السكانر بالحاسب\n'
+                '• تشغيل السكانر\n'
+                '• تثبيت برنامج تشغيل السكانر\n\n'
+                'هل تريد اختيار عدة صور من الحاسب بدلاً من المسح؟',
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            if reply == QMessageBox.StandardButton.Yes:
+                self._select_multiple_image_files()
+            return
+        
         try:
-            import win32com.client
-            import tempfile
-            from datetime import datetime
-            
             reply = QMessageBox.question(
                 self, 'مسح تلقائي جماعي',
                 '🔄 مسح تلقائي مستمر لجميع الأوراق\n\n'
@@ -471,10 +610,6 @@ class AddDocumentDialog(QDialog):
     
     def _scan_automatic_feeder(self):
         """مسح تلقائي باستخدام وحدة التغذية التلقائية (ADF) مع إمكانية استئناف"""
-        import win32com.client
-        import tempfile
-        from datetime import datetime
-        
         wia = win32com.client.Dispatch("WIA.DeviceManager")
         
         if wia.DeviceInfos.Count == 0:
@@ -561,10 +696,6 @@ class AddDocumentDialog(QDialog):
     
     def _scan_continuous_manual(self):
         """مسح متتالي سريع بدون نوافذ متكررة مع إمكانية استئناف"""
-        import win32com.client
-        import tempfile
-        from datetime import datetime
-        
         QMessageBox.information(
             self, 'مسح متتالي',
             '📄 مسح متتالي سريع\n\n'
@@ -777,11 +908,40 @@ class AddDocumentDialog(QDialog):
     
     def scan_and_extract(self):
         """مسح من السكانر واستخراج المعلومات تلقائياً (بطيء)"""
+        global SCANNER_AVAILABLE, SCANNER_COUNT
+        
+        # التحقق من توفر المكتبة
+        if not SCANNER_AVAILABLE:
+            reply = QMessageBox.question(
+                self, 'السكانر غير متاح',
+                '⚠️ مكتبة السكانر (pywin32) غير مثبتة\n\n'
+                'لتثبيتها، قم بتشغيل الأمر التالي:\n'
+                'pip install pywin32\n\n'
+                'هل تريد اختيار صورة من الحاسب لاستخراج المعلومات منها؟',
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            if reply == QMessageBox.StandardButton.Yes:
+                self.extract_from_image()
+            return
+        
+        # التحقق من وجود سكانر متصل
+        self._update_scanner_status()
+        if SCANNER_COUNT == 0:
+            reply = QMessageBox.question(
+                self, 'السكانر غير متصل',
+                '⚠️ لا يوجد سكانر متصل بالحاسب\n\n'
+                'تأكد من:\n'
+                '• توصيل السكانر بالحاسب\n'
+                '• تشغيل السكانر\n'
+                '• تثبيت برنامج تشغيل السكانر\n\n'
+                'هل تريد اختيار صورة من الحاسب لاستخراج المعلومات منها؟',
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            if reply == QMessageBox.StandardButton.Yes:
+                self.extract_from_image()
+            return
+        
         try:
-            import win32com.client
-            import tempfile
-            from datetime import datetime
-            
             reply = QMessageBox.warning(
                 self, 'تحذير',
                 'الاستخراج التلقائي قد يستغرق 1-2 دقيقة!\n\n'
@@ -1306,55 +1466,55 @@ class MainWindow(QMainWindow):
                             # idx يبدأ من 1، وattachment_details يبدأ من 0
                             # idx - 1 يعطينا index الصحيح في attachment_details
                             print(f"[DEBUG] معالجة الصورة idx={idx}, idx-1={idx-1}, len(attachment_details)={len(attachment_details)}")
+                            
                             if idx - 1 < len(attachment_details):
                                 attachment_info = attachment_details[idx - 1]
                                 print(f"[DEBUG] attachment_info للصورة {idx}: {attachment_info}")
-                                # إذا كان هناك معلومات مخصصة للمرفق، استخدمها
-                                # التحقق من أن القاموس ليس None وليس فارغاً وأن هناك قيم غير فارغة
-                                has_custom_data = False
-                                if attachment_info is not None and isinstance(attachment_info, dict):
-                                    # نتحقق من أن هناك على الأقل قيمة واحدة غير فارغة
-                                    has_custom_data = any(
-                                        v is not None and str(v).strip() != '' 
-                                        for v in attachment_info.values()
-                                    )
+                            
+                            # دمج البيانات: استخدام بيانات المرفق المخصصة إن وجدت، وإلا استخدام بيانات الوثيقة الرئيسية
+                            # هذا يضمن أن الحقول التي أدخلها المستخدم للمرفق لا يتم تجاوزها
+                            merged_data = {
+                                'doc_name': data['doc_name'],
+                                'doc_date': data['doc_date'],
+                                'doc_title': data['doc_title'],
+                                'issuing_dept': data.get('issuing_dept', ''),
+                                'doc_classification': data.get('doc_classification', ''),
+                                'notes': ''
+                            }
+                            
+                            # إذا كان هناك معلومات مخصصة للمرفق، استخدمها فقط للحقول غير الفارغة
+                            if attachment_info is not None and isinstance(attachment_info, dict):
+                                for key in ['doc_name', 'doc_date', 'doc_title', 'doc_classification', 'notes']:
+                                    value = attachment_info.get(key)
+                                    if value is not None and str(value).strip() != '':
+                                        merged_data[key] = value
+                                        print(f"[DEBUG] استخدام قيمة مخصصة للمرفق {idx}: {key} = {value}")
                                 
-                                print(f"[DEBUG] has_custom_data للصورة {idx}: {has_custom_data}")
-                                
-                                if has_custom_data:
-                                    # إنشاء ملاحظات تحتوي على معلومات المرفق المعدلة
-                                    print(f"[DEBUG] المرفق {idx}: استخدام معلومات مخصصة")
-                                    print(f"        الرقم: {attachment_info.get('doc_name')}")
-                                    print(f"        التاريخ: {attachment_info.get('doc_date')}")
-                                    print(f"        المضمون: {attachment_info.get('doc_title')}")
-                                    notes_parts = []
-                                    if attachment_info.get('doc_name'):
-                                        notes_parts.append(f"رقم: {attachment_info['doc_name']}")
-                                    if attachment_info.get('doc_date'):
-                                        notes_parts.append(f"تاريخ: {attachment_info['doc_date']}")
-                                    if attachment_info.get('doc_title'):
-                                        notes_parts.append(f"مضمون: {attachment_info['doc_title']}")
-                                    if attachment_info.get('issuing_dept') and attachment_info['issuing_dept'] != 'اختر جهة الإصدار':
-                                        notes_parts.append(f"جهة: {attachment_info['issuing_dept']}")
-                                    if attachment_info.get('doc_classification'):
-                                        notes_parts.append(f"تصنيف: {attachment_info['doc_classification']}")
-                                    if attachment_info.get('notes'):
-                                        notes_parts.append(f"ملاحظات: {attachment_info['notes']}")
-                                    
-                                    if notes_parts:
-                                        notes_text = " | ".join(notes_parts)
-                                else:
-                                    # إذا لم يتم إدخال معلومات للمرفق، استخدم معلومات الوثيقة الرئيسية
-                                    print(f"[DEBUG] المرفق {idx}: استخدام معلومات رئيسية (attachment_info={attachment_info})")
-                                    notes_parts = []
-                                    notes_parts.append(f"رقم: {data['doc_name']}")
-                                    notes_parts.append(f"تاريخ: {data['doc_date']}")
-                                    notes_parts.append(f"مضمون: {data['doc_title']}")
-                                    if data.get('issuing_dept'):
-                                        notes_parts.append(f"جهة: {data['issuing_dept']}")
-                                    if data.get('doc_classification'):
-                                        notes_parts.append(f"تصنيف: {data['doc_classification']}")
-                                    notes_text = " | ".join(notes_parts)
+                                # معالجة خاصة لجهة الإصدار
+                                dept_value = attachment_info.get('issuing_dept')
+                                if dept_value and dept_value != 'اختر جهة الإصدار' and str(dept_value).strip() != '':
+                                    merged_data['issuing_dept'] = dept_value
+                                    print(f"[DEBUG] استخدام جهة إصدار مخصصة للمرفق {idx}: {dept_value}")
+                            
+                            print(f"[DEBUG] البيانات المدمجة للمرفق {idx}: {merged_data}")
+                            
+                            # إنشاء ملاحظات تحتوي على معلومات المرفق
+                            notes_parts = []
+                            if merged_data.get('doc_name'):
+                                notes_parts.append(f"رقم: {merged_data['doc_name']}")
+                            if merged_data.get('doc_date'):
+                                notes_parts.append(f"تاريخ: {merged_data['doc_date']}")
+                            if merged_data.get('doc_title'):
+                                notes_parts.append(f"مضمون: {merged_data['doc_title']}")
+                            if merged_data.get('issuing_dept'):
+                                notes_parts.append(f"جهة: {merged_data['issuing_dept']}")
+                            if merged_data.get('doc_classification'):
+                                notes_parts.append(f"تصنيف: {merged_data['doc_classification']}")
+                            if merged_data.get('notes'):
+                                notes_parts.append(f"ملاحظات: {merged_data['notes']}")
+                            
+                            if notes_parts:
+                                notes_text = " | ".join(notes_parts)
                             
                             # حفظ الصورة مع الوثيقة الرئيسية
                             saved_path = self.image_manager.save_image(
