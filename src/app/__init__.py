@@ -12,7 +12,7 @@ from .helpers import (
     DateHelper, FileHelper, ValidationHelper,
     ExportHelper, DatabaseBackupHelper
 )
-
+# تعريف ما يتم تصديره عند استخدام 'from app import *'S
 __all__ = [
     'FilenameParser',
     'ImageSequenceHandler',
