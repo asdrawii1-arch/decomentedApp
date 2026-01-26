@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import (
     QTableWidgetItem, QPushButton, QLineEdit, QLabel, QFileDialog,
     QDialog, QDialogButtonBox, QComboBox, QSpinBox, QMessageBox,
     QTabWidget, QGroupBox, QFormLayout, QTextEdit, QListWidget,
-    QListWidgetItem, QProgressBar
+    QListWidgetItem, QProgressBar, QProgressDialog, QCheckBox
 )
 from PyQt6.QtCore import Qt, QSize, pyqtSignal, QTimer
 from PyQt6.QtGui import QIcon, QFont, QColor
@@ -1196,17 +1196,18 @@ class MainWindow(QMainWindow):
         
         # جدول الوثائق
         self.documents_table = QTableWidget()
-        self.documents_table.setColumnCount(7)
+        self.documents_table.setColumnCount(8)
         self.documents_table.setHorizontalHeaderLabels([
-            'رقم الوثيقة', 'التاريخ', 'المضمون', 'جهة الإصدار', 'التصنيف', 'المادة القانونية', 'عدد الصور'
+            '☑', 'رقم الوثيقة', 'التاريخ', 'المضمون', 'جهة الإصدار', 'التصنيف', 'المادة القانونية', 'عدد الصور'
         ])
-        self.documents_table.setColumnWidth(0, 100)
+        self.documents_table.setColumnWidth(0, 40)  # Checkbox column
         self.documents_table.setColumnWidth(1, 100)
-        self.documents_table.setColumnWidth(2, 200)
-        self.documents_table.setColumnWidth(3, 150)
-        self.documents_table.setColumnWidth(4, 100)
-        self.documents_table.setColumnWidth(5, 180)
-        self.documents_table.setColumnWidth(6, 80)
+        self.documents_table.setColumnWidth(2, 100)
+        self.documents_table.setColumnWidth(3, 200)
+        self.documents_table.setColumnWidth(4, 150)
+        self.documents_table.setColumnWidth(5, 100)
+        self.documents_table.setColumnWidth(6, 180)
+        self.documents_table.setColumnWidth(7, 80)
         self.documents_table.setAlternatingRowColors(True)
         self.documents_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.documents_table.setSelectionMode(QTableWidget.SelectionMode.MultiSelection)
@@ -1220,9 +1221,17 @@ class MainWindow(QMainWindow):
         self.documents_table.setRowCount(0)
         documents = self.db.get_all_documents()
         
-        for doc in documents:
+        # Disable updates for better performance
+        self.documents_table.setUpdatesEnabled(False)
+        
+        for idx, doc in enumerate(documents):
             row = self.documents_table.rowCount()
             self.documents_table.insertRow(row)
+            
+            # Checkbox column
+            checkbox = QCheckBox()
+            checkbox.setStyleSheet('margin-left: 10px;')
+            self.documents_table.setCellWidget(row, 0, checkbox)
             
             # رقم الوثيقة (من اسم الوثيقة)
             doc_name = doc[1] or ''
@@ -1230,26 +1239,33 @@ class MainWindow(QMainWindow):
             doc_number = doc_name.split()[0] if doc_name else ''
             item = QTableWidgetItem(doc_number)
             item.setData(Qt.ItemDataRole.UserRole, doc[0])  # احفظ معرف الوثيقة
-            self.documents_table.setItem(row, 0, item)
+            self.documents_table.setItem(row, 1, item)
             
             # التاريخ
-            self.documents_table.setItem(row, 1, QTableWidgetItem(doc[2] or ''))
+            self.documents_table.setItem(row, 2, QTableWidgetItem(doc[2] or ''))
             
             # المضمون (العنوان)
-            self.documents_table.setItem(row, 2, QTableWidgetItem(doc[3] or ''))
+            self.documents_table.setItem(row, 3, QTableWidgetItem(doc[3] or ''))
             
             # جهة الإصدار
-            self.documents_table.setItem(row, 3, QTableWidgetItem(doc[4] or ''))
+            self.documents_table.setItem(row, 4, QTableWidgetItem(doc[4] or ''))
             
             # التصنيف
-            self.documents_table.setItem(row, 4, QTableWidgetItem(doc[5] or ''))
+            self.documents_table.setItem(row, 5, QTableWidgetItem(doc[5] or ''))
             
             # المادة القانونية
-            self.documents_table.setItem(row, 5, QTableWidgetItem(doc[6] or ''))
+            self.documents_table.setItem(row, 6, QTableWidgetItem(doc[6] or ''))
             
             # عدد الصور
             images = self.db.get_document_images(doc[0])
-            self.documents_table.setItem(row, 6, QTableWidgetItem(str(len(images))))
+            self.documents_table.setItem(row, 7, QTableWidgetItem(str(len(images))))
+            
+            # Process events every 50 rows to keep UI responsive
+            if idx % 50 == 0:
+                QApplication.processEvents()
+        
+        # Re-enable updates
+        self.documents_table.setUpdatesEnabled(True)
     
     def add_document(self):
         """إضافة وثيقة جديدة"""
@@ -1534,8 +1550,23 @@ class MainWindow(QMainWindow):
                                     break
             
             # حفظ الوثائق والصور في قاعدة البيانات
+            # Calculate total images for progress
+            total_images = sum(len(doc_info['images']) for doc_info in documents_to_add.values())
+            
+            # Create progress dialog
+            progress = QProgressDialog('جاري استيراد الصور...', 'إلغاء', 0, total_images, self)
+            progress.setWindowTitle('استيراد الصور')
+            progress.setWindowModality(Qt.WindowModality.WindowModal)
+            progress.setMinimumDuration(0)
+            progress.show()
+            
             imported_count = 0
+            current_progress = 0
+            
             for doc_key, doc_info in documents_to_add.items():
+                if progress.wasCanceled():
+                    break
+                    
                 if not doc_info['images']:
                     continue
                 
@@ -1557,6 +1588,14 @@ class MainWindow(QMainWindow):
                 
                 # حفظ الصور
                 for img_idx, img_info in enumerate(doc_info['images'], 1):
+                    if progress.wasCanceled():
+                        break
+                    
+                    current_progress += 1
+                    progress.setValue(current_progress)
+                    progress.setLabelText(f'جاري استيراد الصورة {current_progress} من {total_images}...')
+                    QApplication.processEvents()  # Keep UI responsive
+                    
                     try:
                         # حفظ الصورة في المجلد
                         saved_path = self.image_manager.save_image(
@@ -1581,6 +1620,9 @@ class MainWindow(QMainWindow):
                     except Exception as e:
                         print(f"[ERROR] خطأ في حفظ الصورة {img_info['filename']}: {str(e)}")
             
+            progress.setValue(total_images)
+            progress.close()
+            
             # الرسالة النهائية
             msg = f"✅ تم استيراد {imported_count} صورة بنجاح\n"
             msg += f"في {len(documents_to_add)} وثيقة"
@@ -1598,8 +1640,8 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, 'تنبيه', 'يجب اختيار وثيقة أولاً')
             return
         
-        # احصل على معرف الوثيقة من البيانات المخزنة في الصف
-        doc_id_item = self.documents_table.item(current_row, 0)
+        # احصل على معرف الوثيقة من البيانات المخزنة في الصف (column 1 now)
+        doc_id_item = self.documents_table.item(current_row, 1)
         if not doc_id_item or not doc_id_item.data(Qt.ItemDataRole.UserRole):
             QMessageBox.warning(self, 'خطأ', 'لم يتم العثور على معرف الوثيقة')
             return
@@ -1657,8 +1699,8 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, 'تنبيه', 'يجب اختيار وثيقة أولاً')
             return
         
-        # احصل على معرف الوثيقة من UserRole
-        doc_id_item = self.documents_table.item(current_row, 0)
+        # احصل على معرف الوثيقة من UserRole (column 1 now)
+        doc_id_item = self.documents_table.item(current_row, 1)
         if not doc_id_item or not doc_id_item.data(Qt.ItemDataRole.UserRole):
             QMessageBox.warning(self, 'خطأ', 'لم يتم العثور على معرف الوثيقة')
             return
@@ -1678,17 +1720,25 @@ class MainWindow(QMainWindow):
     
     def select_all_documents(self):
         """تحديد جميع الوثائق"""
-        self.documents_table.selectAll()
+        for row in range(self.documents_table.rowCount()):
+            checkbox = self.documents_table.cellWidget(row, 0)
+            if checkbox:
+                checkbox.setChecked(True)
     
     def delete_selected_documents(self):
         """حذف جميع الوثائق المحددة"""
-        selected_rows = self.documents_table.selectionModel().selectedRows()
+        # Get checked rows
+        checked_rows = []
+        for row in range(self.documents_table.rowCount()):
+            checkbox = self.documents_table.cellWidget(row, 0)
+            if checkbox and checkbox.isChecked():
+                checked_rows.append(row)
         
-        if not selected_rows:
+        if not checked_rows:
             QMessageBox.warning(self, 'تنبيه', 'يجب تحديد وثائق أولاً')
             return
         
-        count = len(selected_rows)
+        count = len(checked_rows)
         reply = QMessageBox.question(
             self,
             'تأكيد الحذف',
@@ -1697,19 +1747,43 @@ class MainWindow(QMainWindow):
         )
         
         if reply == QMessageBox.StandardButton.Yes:
-            # احذف من الأسفل للأعلى لتجنب مشاكل الفهرسة
+            # Get doc IDs from checked rows
             doc_ids = []
-            for row in selected_rows:
-                doc_id = int(self.documents_table.item(row.row(), 0).text())
-                doc_ids.append(doc_id)
+            for row in checked_rows:
+                doc_id_item = self.documents_table.item(row, 1)  # Column 1 now has doc number
+                if doc_id_item:
+                    doc_id = doc_id_item.data(Qt.ItemDataRole.UserRole)
+                    if doc_id:
+                        doc_ids.append(doc_id)
             
-            # احذفها من قاعدة البيانات
-            for doc_id in doc_ids:
-                self.db.delete_document(doc_id)
+            # Create progress dialog
+            progress = QProgressDialog('جاري حذف الوثائق...', 'إلغاء', 0, len(doc_ids), self)
+            progress.setWindowTitle('حذف الوثائق')
+            progress.setWindowModality(Qt.WindowModality.WindowModal)
+            progress.setMinimumDuration(0)
+            progress.show()
             
-            # أعد تحميل الجدول
+            # Delete from database with progress
+            deleted_count = 0
+            for i, doc_id in enumerate(doc_ids):
+                if progress.wasCanceled():
+                    break
+                progress.setValue(i)
+                progress.setLabelText(f'جاري حذف الوثيقة {i + 1} من {len(doc_ids)}...')
+                QApplication.processEvents()  # Keep UI responsive
+                
+                try:
+                    self.db.delete_document(doc_id)
+                    deleted_count += 1
+                except Exception as e:
+                    print(f'خطأ في حذف الوثيقة {doc_id}: {e}')
+            
+            progress.setValue(len(doc_ids))
+            progress.close()
+            
+            # Reload table
             self.load_documents()
-            QMessageBox.information(self, 'نجح', f'تم حذف {count} وثيقة بنجاح')
+            QMessageBox.information(self, 'نجح', f'تم حذف {deleted_count} وثيقة بنجاح')
     
     def search_documents(self):
         """البحث عن الوثائق والصور"""
@@ -1731,35 +1805,50 @@ class MainWindow(QMainWindow):
         self.documents_table.setRowCount(0)
         results = self.db.search_documents(search_term, search_field)
         
-        for doc in results:
+        # Disable updates for better performance
+        self.documents_table.setUpdatesEnabled(False)
+        
+        for idx, doc in enumerate(results):
             row = self.documents_table.rowCount()
             self.documents_table.insertRow(row)
+            
+            # Checkbox column
+            checkbox = QCheckBox()
+            checkbox.setStyleSheet('margin-left: 10px;')
+            self.documents_table.setCellWidget(row, 0, checkbox)
             
             # رقم الوثيقة
             doc_name = doc[1] or ''
             doc_number = doc_name.split()[0] if doc_name else ''
             item = QTableWidgetItem(doc_number)
             item.setData(Qt.ItemDataRole.UserRole, doc[0])  # احفظ معرف الوثيقة
-            self.documents_table.setItem(row, 0, item)
+            self.documents_table.setItem(row, 1, item)
             
             # التاريخ
-            self.documents_table.setItem(row, 1, QTableWidgetItem(doc[2] or ''))
+            self.documents_table.setItem(row, 2, QTableWidgetItem(doc[2] or ''))
             
             # المضمون
-            self.documents_table.setItem(row, 2, QTableWidgetItem(doc[3] or ''))
+            self.documents_table.setItem(row, 3, QTableWidgetItem(doc[3] or ''))
             
             # الجهة
-            self.documents_table.setItem(row, 3, QTableWidgetItem(doc[4] or ''))
+            self.documents_table.setItem(row, 4, QTableWidgetItem(doc[4] or ''))
             
             # التصنيف
-            self.documents_table.setItem(row, 4, QTableWidgetItem(doc[5] or ''))
+            self.documents_table.setItem(row, 5, QTableWidgetItem(doc[5] or ''))
             
             # المادة القانونية
-            self.documents_table.setItem(row, 5, QTableWidgetItem(doc[6] or ''))
+            self.documents_table.setItem(row, 6, QTableWidgetItem(doc[6] or ''))
             
             # عدد الصور
             images = self.db.get_document_images(doc[0])
-            self.documents_table.setItem(row, 6, QTableWidgetItem(str(len(images))))
+            self.documents_table.setItem(row, 7, QTableWidgetItem(str(len(images))))
+            
+            # Process events every 50 rows
+            if idx % 50 == 0:
+                QApplication.processEvents()
+        
+        # Re-enable updates
+        self.documents_table.setUpdatesEnabled(True)
 
 
 def main():
