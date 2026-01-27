@@ -119,6 +119,84 @@ class DatabaseManager:
         
         return results
     
+    def search_documents_and_attachments(self, search_term, search_field='doc_name'):
+        """البحث عن الوثائق والمرفقات"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        # البحث في الوثائق الرئيسية
+        query = f'SELECT * FROM documents WHERE {search_field} LIKE ?'
+        cursor.execute(query, (f'%{search_term}%',))
+        doc_results = cursor.fetchall()
+        
+        # تحويل النتائج لقاموس للتحقق من التكرار
+        results_dict = {}
+        for doc in doc_results:
+            doc_id = doc[0]
+            doc_name = doc[1] or ''
+            # استخراج رقم الوثيقة من الاسم
+            doc_number = doc_name.split()[0] if doc_name else ''
+            results_dict[doc_id] = {
+                'doc': doc,
+                'doc_number': doc_number,
+                'source': 'main',  # المصدر: الوثيقة الرئيسية
+                'attachment_info': None
+            }
+        
+        # البحث في المرفقات (حقل notes في جدول images)
+        cursor.execute('''
+            SELECT DISTINCT i.document_id, i.notes, d.*
+            FROM images i
+            JOIN documents d ON i.document_id = d.id
+            WHERE i.notes LIKE ?
+        ''', (f'%{search_term}%',))
+        
+        attachment_results = cursor.fetchall()
+        
+        for row in attachment_results:
+            doc_id = row[0]
+            attachment_notes = row[1]
+            doc_data = row[2:]  # بيانات الوثيقة تبدأ من العمود 2
+            
+            # استخراج رقم المرفق من الملاحظات
+            attachment_number = None
+            if attachment_notes:
+                # البحث عن "رقم: XXX" في الملاحظات
+                import re
+                match = re.search(r'رقم:\s*([^\|]+)', attachment_notes)
+                if match:
+                    attachment_number = match.group(1).strip()
+            
+            # إذا كانت الوثيقة موجودة بالفعل في النتائج
+            if doc_id in results_dict:
+                # تحقق إذا كان رقم المرفق مختلف عن رقم الوثيقة الرئيسية
+                main_doc_number = results_dict[doc_id]['doc_number']
+                if attachment_number and attachment_number != main_doc_number:
+                    # أضف كنتيجة منفصلة (مرفق)
+                    new_key = f"{doc_id}_att_{attachment_number}"
+                    if new_key not in results_dict:
+                        results_dict[new_key] = {
+                            'doc': doc_data,
+                            'doc_number': attachment_number,
+                            'source': 'attachment',
+                            'attachment_info': attachment_notes
+                        }
+            else:
+                # الوثيقة غير موجودة، أضفها
+                results_dict[doc_id] = {
+                    'doc': doc_data,
+                    'doc_number': attachment_number or '',
+                    'source': 'attachment',
+                    'attachment_info': attachment_notes
+                }
+        
+        conn.close()
+        
+        # حفظ في السجل
+        self.save_search_history(search_term)
+        
+        return results_dict
+    
     def save_search_history(self, search_term):
         """حفظ سجل البحث"""
         conn = sqlite3.connect(self.db_path)

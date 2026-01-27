@@ -23,11 +23,20 @@ from app.ui_styles import COLORS
 class DocumentViewerWindow(QMainWindow):
     """نافذة عرض الوثائق"""
     
-    def __init__(self, document_id, document_data, image_paths, parent=None):
+    def __init__(self, document_id, document_data, images_data, parent=None):
         super().__init__(parent)
         self.document_id = document_id
         self.document_data = document_data
-        self.image_paths = image_paths if image_paths else []
+        
+        # images_data يمكن أن يكون قائمة من القواميس أو قائمة من المسارات (للتوافقية)
+        if images_data and isinstance(images_data[0], dict):
+            self.images_data = images_data
+            self.image_paths = [img['path'] for img in images_data]
+        else:
+            # التوافقية مع الكود القديم
+            self.image_paths = images_data if images_data else []
+            self.images_data = [{'path': p, 'notes': None} for p in self.image_paths]
+        
         self.current_page = 0
         self.image_manager = None
         
@@ -55,22 +64,15 @@ class DocumentViewerWindow(QMainWindow):
         
         main_layout = QVBoxLayout()
         
-        # معلومات الوثيقة
-        info_layout = QHBoxLayout()
-        
-        info_text = f"""
-        <b>اسم الوثيقة:</b> {self.document_data[1]}<br>
-        <b>التاريخ:</b> {self.document_data[2]}<br>
-        <b>الجهة:</b> {self.document_data[4]}<br>
-        <b>عدد الصور المحملة:</b> {len(self.image_paths)}<br>
-        <b>الحالة:</b> {'✓ جاهزة' if self.image_paths else '✗ لا توجد صور'}
-        """
-        
-        info_label = QLabel(info_text)
-        info_label.setStyleSheet(f"background-color: {COLORS['light_gray']}; padding: 10px; font-size: 12px;")
-        info_layout.addWidget(info_label)
-        
-        main_layout.addLayout(info_layout)
+        # معلومات الصورة/المرفق الحالي (شريط واحد فقط)
+        self.current_image_info = QLabel()
+        self.current_image_info.setStyleSheet(
+            "background-color: #2c3e50; color: white; padding: 12px; "
+            "font-size: 13px; border-radius: 5px; margin: 5px;"
+        )
+        self.current_image_info.setWordWrap(True)
+        self.current_image_info.setMinimumHeight(80)
+        main_layout.addWidget(self.current_image_info)
         
         # منطقة عرض الصور مع قائمة الصور
         content_layout = QHBoxLayout()
@@ -211,7 +213,59 @@ class DocumentViewerWindow(QMainWindow):
             self.page_spin.setValue(index + 1)
             self.page_spin.blockSignals(False)
             
+            # عرض معلومات الصورة/المرفق الحالي
+            self._update_current_image_info(index)
+            
             print(f"  ✅ تم تحميل الصورة بنجاح (الحجم بعد التحجيم: {scaled_pixmap.width()}x{scaled_pixmap.height()})")
+    
+    def _update_current_image_info(self, index):
+        """تحديث معلومات الصورة/المرفق الحالي"""
+        total_pages = len(self.image_paths)
+        
+        if index < len(self.images_data):
+            img_data = self.images_data[index]
+            notes = img_data.get('notes', '')
+            
+            if index == 0:
+                # الصورة الأولى = الوثيقة الرئيسية
+                type_icon = "📄"
+                type_text = "الوثيقة الرئيسية"
+            else:
+                # المرفقات
+                type_icon = "📎"
+                type_text = f"المرفق {index}"
+            
+            # بناء النص بتنسيق أنيق
+            header = f"<span style='font-size: 15px;'>{type_icon} <b>{type_text}</b></span>"
+            page_info = f"<span style='color: #bdc3c7;'>الصفحة {index + 1} من {total_pages}</span>"
+            
+            if notes:
+                # تحويل الملاحظات لتنسيق أفضل مع أيقونات
+                notes_parts = notes.split(' | ')
+                notes_html = ""
+                for part in notes_parts:
+                    if part.startswith('رقم:'):
+                        notes_html += f"<br>🔢 {part}"
+                    elif part.startswith('تاريخ:'):
+                        notes_html += f"<br>📅 {part}"
+                    elif part.startswith('مضمون:'):
+                        notes_html += f"<br>📝 {part}"
+                    elif part.startswith('جهة:'):
+                        notes_html += f"<br>🏢 {part}"
+                    elif part.startswith('تصنيف:'):
+                        notes_html += f"<br>🏷️ {part}"
+                    elif part.startswith('ملاحظات:'):
+                        notes_html += f"<br>💬 {part}"
+                    else:
+                        notes_html += f"<br>• {part}"
+                
+                info_text = f"{header} &nbsp;&nbsp; {page_info}{notes_html}"
+            else:
+                info_text = f"{header} &nbsp;&nbsp; {page_info}<br><br><span style='color: #95a5a6;'>لا توجد معلومات إضافية</span>"
+            
+            self.current_image_info.setText(info_text)
+        else:
+            self.current_image_info.setText(f"<b>📄 الصورة {index + 1} من {total_pages}</b>")
     
     def prev_page(self):
         """الصفحة السابقة"""

@@ -40,16 +40,23 @@ from app.image_manager import ImageManager
 from app.document_viewer import DocumentViewerWindow
 from app.helpers import ValidationHelper, DateHelper, ExportHelper, DatabaseBackupHelper
 
+# استيراد OCR اختياري
+try:
+    from app.ocr_extractor import OCRExtractor
+    OCR_AVAILABLE = True
+except ImportError:
+    OCR_AVAILABLE = False
+    print("[WARNING] مكتبة easyocr غير مثبتة - ميزة استخراج المضمون غير متاحة")
+
 
 class AttachmentDetailsDialog(QDialog):
     """نافذة بسيطة لإدخال معلومات المرفقات مع معاينة الصور"""
     
-    def __init__(self, parent=None, scanned_images=[], start_index=0, main_doc_data=None):
+    def __init__(self, parent=None, scanned_images=[], start_index=0):
         super().__init__(parent)
         self.scanned_images = scanned_images
         self.current_index = start_index
         self.attachment_data = {}
-        self.main_doc_data = main_doc_data or {}
         
         self.setWindowTitle('معلومات المرفقات')
         self.setGeometry(100, 100, 950, 650)
@@ -64,12 +71,7 @@ class AttachmentDetailsDialog(QDialog):
         self.title_label = QLabel()
         self.title_label.setStyleSheet('font-size: 16px; font-weight: bold; color: #2c3e50;')
         header_layout.addWidget(self.title_label)
-        
-        # زر نسخ من الوثيقة الرئيسية
-        self.copy_all_btn = QPushButton('📋 نسخ من الوثيقة الرئيسية')
-        self.copy_all_btn.setStyleSheet('background-color: #3498db; color: white; padding: 8px; font-size: 13px;')
-        self.copy_all_btn.clicked.connect(self.copy_all_from_main)
-        header_layout.addWidget(self.copy_all_btn)
+        header_layout.addStretch()
         
         main_layout.addLayout(header_layout)
         
@@ -175,26 +177,6 @@ class AttachmentDetailsDialog(QDialog):
         main_layout.addLayout(button_layout)
         
         self.setLayout(main_layout)
-    
-    def copy_all_from_main(self):
-        """نسخ جميع المعلومات من الوثيقة الرئيسية"""
-        if not self.main_doc_data:
-            QMessageBox.warning(self, 'تحذير', 'لا توجد معلومات في الوثيقة الرئيسية')
-            return
-        
-        self.doc_name.setText(str(self.main_doc_data.get('doc_name', '')))
-        self.doc_date.setText(str(self.main_doc_data.get('doc_date', '')))
-        self.doc_title.setText(str(self.main_doc_data.get('doc_title', '')))
-        self.doc_classification.setText(str(self.main_doc_data.get('doc_classification', '')))
-        self.legal_paragraph.setPlainText(str(self.main_doc_data.get('legal_paragraph', '')))
-        
-        dept = self.main_doc_data.get('issuing_dept', '')
-        if dept:
-            index = self.issuing_dept.findText(str(dept))
-            if index >= 0:
-                self.issuing_dept.setCurrentIndex(index)
-        
-        QMessageBox.information(self, 'تم ✅', 'تم نسخ المعلومات من الوثيقة الرئيسية')
     
     def load_attachment(self, index):
         """تحميل معلومات وصورة المرفق الحالي"""
@@ -331,6 +313,7 @@ class AddDocumentDialog(QDialog):
         self.image_manager = image_manager
         self.scanned_image_path = None
         self.scanned_images = []  # قائمة لحفظ عدة صور
+        self.attachment_details_dict = {}  # قاموس لحفظ بيانات المرفقات
         self.init_ui()
     
     def init_ui(self):
@@ -834,68 +817,45 @@ class AddDocumentDialog(QDialog):
     
     def _collect_attachment_details(self):
         """جمع معلومات تفصيلية لجميع المرفقات باستخدام نافذة واحدة مع التنقل"""
-        if not hasattr(self, 'attachment_details'):
-            self.attachment_details = []
         
-        # جمع معلومات الوثيقة الرئيسية الحالية (إذا كانت متوفرة)
-        main_doc_data = {
-            'doc_name': self.doc_name.text(),
-            'doc_date': self.doc_date.text(),
-            'doc_title': self.doc_title.text(),
-            'issuing_dept': self.issuing_dept.currentText() if self.issuing_dept.currentText() != 'اختر جهة الإصدار' else '',
-            'doc_classification': self.doc_classification.text(),
-            'legal_paragraph': self.legal_paragraph.toPlainText()
-        }
+        print(f"[DEBUG] _collect_attachment_details: بدء - عدد الصور = {len(self.scanned_images)}")
         
         # فتح نافذة واحدة لجميع المرفقات مع إمكانية التنقل
+        # start_index=1 يعني أن المرفق الأول (الصورة الثانية) يبدأ من الفهرس 1
         dialog = AttachmentDetailsDialog(
             self, 
             self.scanned_images, 
-            start_index=1,
-            main_doc_data=main_doc_data
+            start_index=1
         )
         
         if dialog.exec() == QDialog.DialogCode.Accepted:
             # الحصول على بيانات جميع المرفقات
+            # all_data هو قاموس بمفاتيح 1, 2, 3, ... 
+            # حيث المفتاح 1 = المرفق الأول (الصورة الثانية في قائمة scanned_images)
             all_data = dialog.get_all_data()
             
-            print(f"[DEBUG] all_data من الحوار: {all_data}")
+            print(f"[DEBUG] _collect_attachment_details: all_data من الحوار = {all_data}")
+            print(f"[DEBUG] _collect_attachment_details: نوع all_data = {type(all_data)}")
+            print(f"[DEBUG] _collect_attachment_details: مفاتيح all_data = {list(all_data.keys())}")
             
-            # إنشاء قائمة بيانات مرتبة حسب الفهرس
-            # all_data يستخدم فهرس 1, 2, 3, ... (من AttachmentDetailsDialog)
-            # نحتاج لتحويلها لقائمة تبدأ من 0
-            self.attachment_details = []
+            # نحفظ القاموس مباشرة بدون تحويل لقائمة
+            # المفتاح في all_data يتوافق مع فهرس الصورة في scanned_images
+            # المفتاح 1 = scanned_images[1] = الصورة الثانية = المرفق الأول
+            self.attachment_details_dict = dict(all_data)  # نسخة عميقة
             
-            print(f"[DEBUG] عدد الصور الممسوحة: {len(self.scanned_images)}")
-            print(f"[DEBUG] مفاتيح all_data: {list(all_data.keys())}")
+            print(f"[DEBUG] _collect_attachment_details: تم الحفظ في self.attachment_details_dict = {self.attachment_details_dict}")
             
-            for idx in range(len(self.scanned_images)):
-                if idx == 0:
-                    # الوثيقة الرئيسية
-                    self.attachment_details.append(None)
-                    print(f"[DEBUG] idx={idx}: الوثيقة الرئيسية (None)")
-                elif idx in all_data:
-                    # المرفق له بيانات مخصصة
-                    self.attachment_details.append(all_data[idx])
-                    print(f"[DEBUG] idx={idx}: بيانات مخصصة = {all_data[idx]}")
-                else:
-                    # المرفق ليس له بيانات مخصصة - سيستخدم المعلومات الرئيسية
-                    self.attachment_details.append({})
-                    print(f"[DEBUG] idx={idx}: قاموس فارغ (سيستخدم المعلومات الرئيسية)")
-            
-            print(f"[DEBUG] attachment_details النهائية: طول={len(self.attachment_details)}")
-            for i, detail in enumerate(self.attachment_details):
-                print(f"[DEBUG]   [{i}]: {detail}")
-            
-            valid_count = len([d for d in self.attachment_details if d and any((d or {}).values())])
+            valid_count = len([v for v in all_data.values() if v and any(str(x).strip() for x in v.values() if x)])
             QMessageBox.information(
                 self, 'تم ✅',
                 f'تم إدخال معلومات {valid_count} مرفق بنجاح\n\n'
+                f'[تصحيح] البيانات المحفوظة: {len(self.attachment_details_dict)} مرفق\n\n'
                 'أدخل معلومات الوثيقة الرئيسية في الحقول أدناه'
             )
         else:
-            # تم الإلغاء - استخدام معلومات الوثيقة الرئيسية لجميع المرفقات
-            self.attachment_details = [None] * len(self.scanned_images)
+            # تم الإلغاء
+            self.attachment_details_dict = {}
+            print(f"[DEBUG] _collect_attachment_details: تم الإلغاء")
             QMessageBox.information(
                 self, 'تم',
                 'سيتم استخدام معلومات الوثيقة الرئيسية لجميع المرفقات'
@@ -1077,6 +1037,12 @@ class AddDocumentDialog(QDialog):
         if dept == 'اختر جهة الإصدار':
             dept = ''
         
+        # التأكد من أن attachment_details_dict موجود
+        att_dict = getattr(self, 'attachment_details_dict', {})
+        print(f"[DEBUG] get_data: attachment_details_dict = {att_dict}")
+        print(f"[DEBUG] get_data: نوعه = {type(att_dict)}")
+        print(f"[DEBUG] get_data: مفاتيحه = {list(att_dict.keys()) if att_dict else 'فارغ'}")
+        
         return {
             'doc_name': self.doc_name.text(),
             'doc_date': self.doc_date.text(),
@@ -1087,7 +1053,7 @@ class AddDocumentDialog(QDialog):
             'sides': self.sides.value(),
             'scanned_image': self.scanned_image_path,
             'scanned_images': self.scanned_images,
-            'attachment_details': getattr(self, 'attachment_details', [])
+            'attachment_details_dict': att_dict
         }
 
 
@@ -1448,57 +1414,85 @@ class MainWindow(QMainWindow):
             
             # حفظ جميع الصور الممسوحة مع الوثيقة الرئيسية
             scanned_images = data.get('scanned_images', [])
-            attachment_details = data.get('attachment_details', [])
+            # attachment_details_dict هو قاموس بمفاتيح 1, 2, 3, ...
+            # حيث المفتاح 1 = المرفق الأول (الصورة الثانية، فهرس 1 في scanned_images)
+            attachment_details_dict = data.get('attachment_details_dict', {})
             
             print(f"[DEBUG] add_document: عدد الصور = {len(scanned_images)}")
-            print(f"[DEBUG] add_document: attachment_details = {attachment_details}")
-            print(f"[DEBUG] add_document: طول attachment_details = {len(attachment_details)}")
+            print(f"[DEBUG] add_document: attachment_details_dict = {attachment_details_dict}")
+            print(f"[DEBUG] add_document: مفاتيح القاموس = {list(attachment_details_dict.keys())}")
             
             if scanned_images:
                 saved_count = 0
                 
-                for idx, image_path in enumerate(scanned_images, 1):
+                # enumerate(scanned_images, 0) -> idx يبدأ من 0
+                # scanned_images[0] = الصورة الأولى = الوثيقة الرئيسية
+                # scanned_images[1] = الصورة الثانية = المرفق الأول -> attachment_details_dict[1]
+                # scanned_images[2] = الصورة الثالثة = المرفق الثاني -> attachment_details_dict[2]
+                
+                for idx, image_path in enumerate(scanned_images):
                     if os.path.exists(image_path):
                         try:
-                            # احصل على معلومات المرفق إن وجدت (للملاحظات فقط)
-                            attachment_info = None
                             notes_text = None
-                            # idx يبدأ من 1، وattachment_details يبدأ من 0
-                            # idx - 1 يعطينا index الصحيح في attachment_details
-                            print(f"[DEBUG] معالجة الصورة idx={idx}, idx-1={idx-1}, len(attachment_details)={len(attachment_details)}")
                             
-                            if idx - 1 < len(attachment_details):
-                                attachment_info = attachment_details[idx - 1]
-                                print(f"[DEBUG] attachment_info للصورة {idx}: {attachment_info}")
+                            print(f"[DEBUG] معالجة الصورة idx={idx}")
                             
-                            # دمج البيانات: استخدام بيانات المرفق المخصصة إن وجدت، وإلا استخدام بيانات الوثيقة الرئيسية
-                            # هذا يضمن أن الحقول التي أدخلها المستخدم للمرفق لا يتم تجاوزها
-                            merged_data = {
-                                'doc_name': data['doc_name'],
-                                'doc_date': data['doc_date'],
-                                'doc_title': data['doc_title'],
-                                'issuing_dept': data.get('issuing_dept', ''),
-                                'doc_classification': data.get('doc_classification', ''),
-                                'notes': ''
-                            }
+                            # الصورة الأولى (idx=0) هي الوثيقة الرئيسية - تستخدم بيانات الوثيقة الرئيسية
+                            # الصورة الثانية (idx=1) هي المرفق الأول - بياناتها في attachment_details_dict[1]
+                            # الصورة الثالثة (idx=2) هي المرفق الثاني - بياناتها في attachment_details_dict[2]
                             
-                            # إذا كان هناك معلومات مخصصة للمرفق، استخدمها فقط للحقول غير الفارغة
-                            if attachment_info is not None and isinstance(attachment_info, dict):
-                                for key in ['doc_name', 'doc_date', 'doc_title', 'doc_classification', 'notes']:
-                                    value = attachment_info.get(key)
-                                    if value is not None and str(value).strip() != '':
-                                        merged_data[key] = value
-                                        print(f"[DEBUG] استخدام قيمة مخصصة للمرفق {idx}: {key} = {value}")
+                            if idx == 0:
+                                # الوثيقة الرئيسية - استخدم بيانات data
+                                print(f"[DEBUG] idx=0: الوثيقة الرئيسية")
+                                merged_data = {
+                                    'doc_name': data['doc_name'],
+                                    'doc_date': data['doc_date'],
+                                    'doc_title': data['doc_title'],
+                                    'issuing_dept': data.get('issuing_dept', ''),
+                                    'doc_classification': data.get('doc_classification', ''),
+                                    'notes': ''
+                                }
+                            else:
+                                # هذا مرفق - ابحث عن بياناته في القاموس
+                                attachment_info = attachment_details_dict.get(idx, {})
+                                print(f"[DEBUG] idx={idx}: المرفق {idx}, attachment_info = {attachment_info}")
                                 
-                                # معالجة خاصة لجهة الإصدار
-                                dept_value = attachment_info.get('issuing_dept')
-                                if dept_value and dept_value != 'اختر جهة الإصدار' and str(dept_value).strip() != '':
-                                    merged_data['issuing_dept'] = dept_value
-                                    print(f"[DEBUG] استخدام جهة إصدار مخصصة للمرفق {idx}: {dept_value}")
+                                # تحقق هل هناك بيانات مخصصة
+                                has_custom_data = False
+                                if attachment_info and isinstance(attachment_info, dict):
+                                    has_custom_data = any(
+                                        v is not None and str(v).strip() != '' and v != 'اختر جهة الإصدار'
+                                        for v in attachment_info.values()
+                                    )
+                                
+                                print(f"[DEBUG] has_custom_data للمرفق {idx}: {has_custom_data}")
+                                
+                                if has_custom_data:
+                                    # المرفق له بيانات مخصصة - استخدمها
+                                    merged_data = {
+                                        'doc_name': attachment_info.get('doc_name') or data['doc_name'],
+                                        'doc_date': attachment_info.get('doc_date') or data['doc_date'],
+                                        'doc_title': attachment_info.get('doc_title') or data['doc_title'],
+                                        'issuing_dept': attachment_info.get('issuing_dept') or data.get('issuing_dept', ''),
+                                        'doc_classification': attachment_info.get('doc_classification') or data.get('doc_classification', ''),
+                                        'notes': attachment_info.get('notes', '')
+                                    }
+                                    print(f"[DEBUG] استخدام بيانات مخصصة للمرفق {idx}")
+                                else:
+                                    # المرفق ليس له بيانات مخصصة - استخدم بيانات الوثيقة الرئيسية
+                                    merged_data = {
+                                        'doc_name': data['doc_name'],
+                                        'doc_date': data['doc_date'],
+                                        'doc_title': data['doc_title'],
+                                        'issuing_dept': data.get('issuing_dept', ''),
+                                        'doc_classification': data.get('doc_classification', ''),
+                                        'notes': ''
+                                    }
+                                    print(f"[DEBUG] استخدام بيانات الوثيقة الرئيسية للمرفق {idx}")
                             
-                            print(f"[DEBUG] البيانات المدمجة للمرفق {idx}: {merged_data}")
+                            print(f"[DEBUG] البيانات النهائية للصورة {idx}: {merged_data}")
                             
-                            # إنشاء ملاحظات تحتوي على معلومات المرفق
+                            # إنشاء نص الملاحظات
                             notes_parts = []
                             if merged_data.get('doc_name'):
                                 notes_parts.append(f"رقم: {merged_data['doc_name']}")
@@ -1516,24 +1510,24 @@ class MainWindow(QMainWindow):
                             if notes_parts:
                                 notes_text = " | ".join(notes_parts)
                             
-                            # حفظ الصورة مع الوثيقة الرئيسية
+                            # حفظ الصورة
                             saved_path = self.image_manager.save_image(
                                 image_path,
                                 doc_id,
-                                idx
+                                idx + 1  # page_number يبدأ من 1
                             )
                             
-                            print(f"[DEBUG] ✅ سيتم حفظ الصورة {idx} بـ notes: {notes_text}")
+                            print(f"[DEBUG] ✅ حفظ الصورة {idx} بـ notes: {notes_text}")
                             
-                            # حفظ في قاعدة البيانات مع ملاحظات المرفق إن وجدت
+                            # حفظ في قاعدة البيانات
                             self.db.add_image(
                                 doc_id,
                                 saved_path,
                                 os.path.basename(image_path),
-                                idx,  # page_number
-                                None,  # image_number
-                                1,  # sides
-                                notes_text  # notes - معلومات المرفق المعدلة
+                                idx + 1,  # page_number يبدأ من 1
+                                None,
+                                1,
+                                notes_text
                             )
                             
                             saved_count += 1
@@ -1581,6 +1575,40 @@ class MainWindow(QMainWindow):
             files = dialog.get_files()
             if not files:
                 return
+            
+            # سؤال المستخدم عن استخراج المضمون من الصور (فقط إذا كان OCR متاحاً)
+            extract_title = False
+            ocr = None
+            
+            if OCR_AVAILABLE:
+                # محاولة تهيئة OCR أولاً للتحقق من توفره
+                try:
+                    test_ocr = OCRExtractor()
+                    if test_ocr.reader:
+                        extract_title = QMessageBox.question(
+                            self, 'استخراج المضمون',
+                            '🔍 هل تريد استخراج المضمون (الموضوع) تلقائياً من الصور؟\n\n'
+                            '• نعم: سيتم قراءة النص من الصور والبحث عن كلمة "الموضوع"\n'
+                            '• لا: سيتم الاستيراد بدون استخراج المضمون\n\n'
+                            '⚠️ ملاحظة: قد يستغرق الاستخراج وقتاً أطول',
+                            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+                        ) == QMessageBox.StandardButton.Yes
+                        
+                        if extract_title:
+                            ocr = test_ocr
+                    else:
+                        # Tesseract غير مثبت - عرض رسالة للمستخدم
+                        QMessageBox.information(
+                            self, 'ميزة استخراج المضمون',
+                            '📝 لتفعيل ميزة استخراج المضمون تلقائياً:\n\n'
+                            '1. حمّل Tesseract OCR من:\n'
+                            '   https://github.com/UB-Mannheim/tesseract/wiki\n\n'
+                            '2. ثبته واختر اللغة العربية أثناء التثبيت\n\n'
+                            '3. أعد تشغيل البرنامج\n\n'
+                            'سيتم الاستيراد بدون استخراج المضمون حالياً.'
+                        )
+                except Exception as e:
+                    print(f"[OCR] خطأ في التحقق من OCR: {str(e)}")
             
             # تحليل الملفات واستخراج البيانات
             documents_to_add = {}
@@ -1714,7 +1742,11 @@ class MainWindow(QMainWindow):
             total_images = sum(len(doc_info['images']) for doc_info in documents_to_add.values())
             
             # Create progress dialog
-            progress = QProgressDialog('جاري استيراد الصور...', 'إلغاء', 0, total_images, self)
+            progress_text = 'جاري استيراد الصور...'
+            if extract_title:
+                progress_text = 'جاري استيراد الصور واستخراج المضمون...'
+            
+            progress = QProgressDialog(progress_text, 'إلغاء', 0, total_images, self)
             progress.setWindowTitle('استيراد الصور')
             progress.setWindowModality(Qt.WindowModality.WindowModal)
             progress.setMinimumDuration(0)
@@ -1722,6 +1754,7 @@ class MainWindow(QMainWindow):
             
             imported_count = 0
             current_progress = 0
+            extracted_titles_count = 0
             
             for doc_key, doc_info in documents_to_add.items():
                 if progress.wasCanceled():
@@ -1730,11 +1763,37 @@ class MainWindow(QMainWindow):
                 if not doc_info['images']:
                     continue
                 
+                # استخراج المضمون من الصور إذا طُلب ذلك (البحث في جميع الصور حتى نجد الموضوع)
+                doc_title = doc_info['data']['doc_title']
+                if extract_title and ocr and not doc_title and doc_info['images']:
+                    progress.setLabelText(f'جاري استخراج المضمون من الصور...')
+                    QApplication.processEvents()
+                    
+                    # البحث في جميع الصور حتى نجد الموضوع
+                    for img_idx, img_info in enumerate(doc_info['images']):
+                        try:
+                            image_path = img_info['path']
+                            print(f"[OCR] محاولة استخراج المضمون من الصورة {img_idx + 1}...")
+                            
+                            extracted_info = ocr.extract_document_info(image_path)
+                            if extracted_info and extracted_info.get('doc_title'):
+                                doc_title = extracted_info['doc_title']
+                                doc_info['data']['doc_title'] = doc_title
+                                extracted_titles_count += 1
+                                print(f"[OCR] تم استخراج المضمون من الصورة {img_idx + 1}: {doc_title[:50]}...")
+                                break  # توقف بعد إيجاد الموضوع
+                        except Exception as e:
+                            print(f"[OCR ERROR] خطأ في الصورة {img_idx + 1}: {str(e)}")
+                            continue
+                
                 # تحقق من وجود الوثيقة بنفس الاسم
                 existing = self.db.search_documents(doc_info['data']['doc_name'], 'doc_name')
                 
                 if existing:
                     doc_id = existing[0][0]
+                    # تحديث المضمون إذا تم استخراجه
+                    if doc_title:
+                        self.db.update_document(doc_id, doc_title=doc_title)
                 else:
                     # أنشئ وثيقة جديدة
                     doc_id = self.db.add_document(
@@ -1787,6 +1846,9 @@ class MainWindow(QMainWindow):
             msg = f"✅ تم استيراد {imported_count} صورة بنجاح\n"
             msg += f"في {len(documents_to_add)} وثيقة"
             
+            if extract_title and extracted_titles_count > 0:
+                msg += f"\n\n📝 تم استخراج المضمون من {extracted_titles_count} وثيقة"
+            
             if unrecognized:
                 msg += f"\n\n⚠️ تم تخطي {len(unrecognized)} ملف"
             
@@ -1821,17 +1883,30 @@ class MainWindow(QMainWindow):
                 return
             
             # استخراج مسارات الصور
-            image_paths = []
+            # جمع بيانات الصور مع معلومات المرفقات
+            # هيكل جدول images: (0:id, 1:document_id, 2:image_path, 3:original_filename, 
+            #                    4:page_number, 5:image_number, 6:sides, 7:created_date, 8:notes)
+            images_data = []
             for img in images:
                 img_path = img[2]  # العمود 2 هو image_path
                 if os.path.exists(img_path):
-                    image_paths.append(img_path)
+                    notes_value = img[8] if len(img) > 8 else None  # العمود 8 هو notes
+                    print(f"[DEBUG] img[8] (notes) = {notes_value}")
+                    images_data.append({
+                        'path': img_path,
+                        'page_number': img[4] if len(img) > 4 else 0,
+                        'notes': notes_value
+                    })
+            
+            image_paths = [img['path'] for img in images_data]
             
             print(f"\n[MAIN] فتح عارض الوثائق:")
             print(f"  • معرف الوثيقة: {doc_id}")
             print(f"  • اسم الوثيقة: {doc[1]}")
             print(f"  • عدد الصور المسجلة: {len(images)}")
             print(f"  • عدد الصور الموجودة: {len(image_paths)}")
+            for i, img_d in enumerate(images_data):
+                print(f"  • صورة {i+1}: notes = {img_d.get('notes', 'لا يوجد')[:50] if img_d.get('notes') else 'لا يوجد'}...")
             if image_paths:
                 print(f"  • أول صورة: {image_paths[0]}")
                 print(f"  • آخر صورة: {image_paths[-1]}")
@@ -1843,9 +1918,9 @@ class MainWindow(QMainWindow):
                 )
                 return
             
-            # فتح نافذة العرض
+            # فتح نافذة العرض مع بيانات الصور الكاملة
             try:
-                viewer = DocumentViewerWindow(doc_id, doc, image_paths, self)
+                viewer = DocumentViewerWindow(doc_id, doc, images_data, self)
                 viewer.show()
                 self.viewer_windows = getattr(self, 'viewer_windows', [])
                 self.viewer_windows.append(viewer)
@@ -1946,7 +2021,7 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, 'نجح', f'تم حذف {deleted_count} وثيقة بنجاح')
     
     def search_documents(self):
-        """البحث عن الوثائق والصور"""
+        """البحث عن الوثائق والمرفقات"""
         search_term = self.search_input.text().strip()
         if not search_term:
             self.load_documents()
@@ -1963,12 +2038,18 @@ class MainWindow(QMainWindow):
         search_field = field_map.get(self.search_field.currentText(), 'doc_name')
         
         self.documents_table.setRowCount(0)
-        results = self.db.search_documents(search_term, search_field)
+        
+        # استخدام البحث الجديد الذي يشمل المرفقات
+        results_dict = self.db.search_documents_and_attachments(search_term, search_field)
         
         # Disable updates for better performance
         self.documents_table.setUpdatesEnabled(False)
         
-        for idx, doc in enumerate(results):
+        for idx, (key, result_data) in enumerate(results_dict.items()):
+            doc = result_data['doc']
+            source = result_data['source']
+            attachment_info = result_data['attachment_info']
+            
             row = self.documents_table.rowCount()
             self.documents_table.insertRow(row)
             
@@ -1977,24 +2058,54 @@ class MainWindow(QMainWindow):
             checkbox.setStyleSheet('margin-left: 10px;')
             self.documents_table.setCellWidget(row, 0, checkbox)
             
-            # رقم الوثيقة
-            doc_name = doc[1] or ''
-            doc_number = doc_name.split()[0] if doc_name else ''
-            item = QTableWidgetItem(doc_number)
+            # رقم الوثيقة/المرفق
+            if source == 'attachment' and attachment_info:
+                # استخراج المعلومات من ملاحظات المرفق
+                doc_number = result_data['doc_number']
+                # إضافة علامة للمرفق
+                display_number = f"📎 {doc_number}" if doc_number else ''
+            else:
+                doc_name = doc[1] or ''
+                doc_number = doc_name.split()[0] if doc_name else ''
+                display_number = doc_number
+            
+            item = QTableWidgetItem(display_number)
             item.setData(Qt.ItemDataRole.UserRole, doc[0])  # احفظ معرف الوثيقة
             self.documents_table.setItem(row, 1, item)
             
             # التاريخ
-            self.documents_table.setItem(row, 2, QTableWidgetItem(doc[2] or ''))
+            if source == 'attachment' and attachment_info:
+                # استخراج التاريخ من ملاحظات المرفق
+                import re
+                date_match = re.search(r'تاريخ:\s*([^\|]+)', attachment_info)
+                date_val = date_match.group(1).strip() if date_match else (doc[2] or '')
+            else:
+                date_val = doc[2] or ''
+            self.documents_table.setItem(row, 2, QTableWidgetItem(date_val))
             
             # المضمون
-            self.documents_table.setItem(row, 3, QTableWidgetItem(doc[3] or ''))
+            if source == 'attachment' and attachment_info:
+                title_match = re.search(r'مضمون:\s*([^\|]+)', attachment_info)
+                title_val = title_match.group(1).strip() if title_match else (doc[3] or '')
+            else:
+                title_val = doc[3] or ''
+            self.documents_table.setItem(row, 3, QTableWidgetItem(title_val))
             
             # الجهة
-            self.documents_table.setItem(row, 4, QTableWidgetItem(doc[4] or ''))
+            if source == 'attachment' and attachment_info:
+                dept_match = re.search(r'جهة:\s*([^\|]+)', attachment_info)
+                dept_val = dept_match.group(1).strip() if dept_match else (doc[4] or '')
+            else:
+                dept_val = doc[4] or ''
+            self.documents_table.setItem(row, 4, QTableWidgetItem(dept_val))
             
             # التصنيف
-            self.documents_table.setItem(row, 5, QTableWidgetItem(doc[5] or ''))
+            if source == 'attachment' and attachment_info:
+                class_match = re.search(r'تصنيف:\s*([^\|]+)', attachment_info)
+                class_val = class_match.group(1).strip() if class_match else (doc[5] or '')
+            else:
+                class_val = doc[5] or ''
+            self.documents_table.setItem(row, 5, QTableWidgetItem(class_val))
             
             # المادة القانونية
             self.documents_table.setItem(row, 6, QTableWidgetItem(doc[6] or ''))
