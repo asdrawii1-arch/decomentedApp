@@ -1246,6 +1246,699 @@ class ImportImagesDialog(QDialog):
         return self.selected_files
 
 
+class DestructionFormDialog(QDialog):
+    """نافذة استمارة إتلاف الوثائق"""
+    
+    ROWS_PER_PAGE = 25  # عدد الصفوف في كل صفحة
+    
+    def __init__(self, parent=None, db=None, selected_docs=None):
+        super().__init__(parent)
+        self.db = db
+        self.selected_docs = selected_docs or []
+        self.setWindowTitle('استمارة إتلاف الوثائق')
+        self.setMinimumSize(900, 700)
+        self.init_ui()
+        self.load_selected_documents()
+        self.update_pages_info()
+    
+    def init_ui(self):
+        """إنشاء واجهة المستخدم"""
+        layout = QVBoxLayout()
+        
+        # عنوان النموذج
+        title = QLabel('📋 استمارة إتلاف الوثائق')
+        title.setStyleSheet('font-size: 18px; font-weight: bold; color: #2c3e50; padding: 10px;')
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(title)
+        
+        # معلومات الرأس
+        header_group = QGroupBox('معلومات الجهة')
+        header_layout = QFormLayout()
+        
+        self.agency_input = QLineEdit()
+        self.agency_input.setPlaceholderText('أدخل اسم الوكالة')
+        header_layout.addRow('الوكالة:', self.agency_input)
+        
+        self.directorate_input = QLineEdit()
+        self.directorate_input.setPlaceholderText('أدخل اسم التشكيل أو المديرية')
+        header_layout.addRow('التشكيل/المديرية:', self.directorate_input)
+        
+        self.section_input = QLineEdit()
+        self.section_input.setPlaceholderText('أدخل اسم القسم')
+        header_layout.addRow('القسم:', self.section_input)
+        
+        self.division_input = QLineEdit()
+        self.division_input.setPlaceholderText('أدخل اسم الشعبة')
+        header_layout.addRow('الشعبة:', self.division_input)
+        
+        header_group.setLayout(header_layout)
+        layout.addWidget(header_group)
+        
+        # معلومات الصفحات
+        pages_info_layout = QHBoxLayout()
+        self.pages_info_label = QLabel('')
+        self.pages_info_label.setStyleSheet('font-size: 12px; color: #666; padding: 5px;')
+        pages_info_layout.addWidget(self.pages_info_label)
+        pages_info_layout.addStretch()
+        layout.addLayout(pages_info_layout)
+        
+        # جدول الوثائق
+        docs_group = QGroupBox('الوثائق المراد إتلافها')
+        docs_layout = QVBoxLayout()
+        
+        # أزرار التحكم بالجدول
+        table_buttons = QHBoxLayout()
+        
+        add_row_btn = QPushButton('➕ إضافة صف')
+        add_row_btn.clicked.connect(self.add_row)
+        table_buttons.addWidget(add_row_btn)
+        
+        remove_row_btn = QPushButton('➖ حذف صف')
+        remove_row_btn.clicked.connect(self.remove_row)
+        table_buttons.addWidget(remove_row_btn)
+        
+        table_buttons.addStretch()
+        
+        load_selected_btn = QPushButton('📥 تحميل الوثائق المحددة')
+        load_selected_btn.clicked.connect(self.load_selected_documents)
+        table_buttons.addWidget(load_selected_btn)
+        
+        docs_layout.addLayout(table_buttons)
+        
+        # الجدول
+        self.docs_table = QTableWidget()
+        self.docs_table.setColumnCount(7)
+        self.docs_table.setHorizontalHeaderLabels([
+            'ت', 'رقم الوثيقة', 'تاريخها', 'جهة الإصدار', 'مضمونها', 'تصنيف الوثيقة\n(أ، ب، ج)', 'الفقرة القانونية'
+        ])
+        self.docs_table.setColumnWidth(0, 40)
+        self.docs_table.setColumnWidth(1, 100)
+        self.docs_table.setColumnWidth(2, 100)
+        self.docs_table.setColumnWidth(3, 120)
+        self.docs_table.setColumnWidth(4, 200)
+        self.docs_table.setColumnWidth(5, 80)
+        self.docs_table.setColumnWidth(6, 150)
+        self.docs_table.setAlternatingRowColors(True)
+        self.docs_table.model().rowsInserted.connect(self.update_pages_info)
+        self.docs_table.model().rowsRemoved.connect(self.update_pages_info)
+        
+        docs_layout.addWidget(self.docs_table)
+        docs_group.setLayout(docs_layout)
+        layout.addWidget(docs_group)
+        
+        # أزرار الإجراءات
+        buttons_layout = QHBoxLayout()
+        
+        print_btn = QPushButton('🖨️ طباعة')
+        print_btn.setStyleSheet('background-color: #9b59b6; color: white; padding: 10px; font-size: 14px;')
+        print_btn.clicked.connect(self.print_form)
+        buttons_layout.addWidget(print_btn)
+        
+        export_excel_btn = QPushButton('📊 تصدير Excel')
+        export_excel_btn.setStyleSheet('background-color: #27ae60; color: white; padding: 10px; font-size: 14px;')
+        export_excel_btn.clicked.connect(self.export_to_excel)
+        buttons_layout.addWidget(export_excel_btn)
+        
+        export_word_btn = QPushButton('📄 تصدير Word')
+        export_word_btn.setStyleSheet('background-color: #3498db; color: white; padding: 10px; font-size: 14px;')
+        export_word_btn.clicked.connect(self.export_to_word)
+        buttons_layout.addWidget(export_word_btn)
+        
+        buttons_layout.addStretch()
+        
+        close_btn = QPushButton('❌ إغلاق')
+        close_btn.clicked.connect(self.reject)
+        buttons_layout.addWidget(close_btn)
+        
+        layout.addLayout(buttons_layout)
+        self.setLayout(layout)
+    
+    def update_pages_info(self):
+        """تحديث معلومات الصفحات"""
+        total_docs = self.docs_table.rowCount()
+        total_pages = (total_docs + self.ROWS_PER_PAGE - 1) // self.ROWS_PER_PAGE if total_docs > 0 else 1
+        self.pages_info_label.setText(f'📄 إجمالي الوثائق: {total_docs} | عدد الصفحات: {total_pages} (25 وثيقة لكل صفحة)')
+    
+    def add_row(self):
+        """إضافة صف جديد"""
+        row = self.docs_table.rowCount()
+        self.docs_table.insertRow(row)
+        self.docs_table.setItem(row, 0, QTableWidgetItem(str(row + 1)))
+    
+    def remove_row(self):
+        """حذف الصف المحدد"""
+        current_row = self.docs_table.currentRow()
+        if current_row >= 0:
+            self.docs_table.removeRow(current_row)
+            # تحديث أرقام التسلسل
+            for i in range(self.docs_table.rowCount()):
+                self.docs_table.setItem(i, 0, QTableWidgetItem(str(i + 1)))
+    
+    def load_selected_documents(self):
+        """تحميل الوثائق المحددة من النافذة الرئيسية"""
+        if not self.selected_docs:
+            return
+        
+        self.docs_table.setRowCount(0)
+        
+        for idx, doc in enumerate(self.selected_docs):
+            row = self.docs_table.rowCount()
+            self.docs_table.insertRow(row)
+            
+            # ت (التسلسل)
+            self.docs_table.setItem(row, 0, QTableWidgetItem(str(idx + 1)))
+            
+            # رقم الوثيقة
+            doc_name = doc[1] or ''
+            doc_number = doc_name.split()[0] if doc_name else ''
+            self.docs_table.setItem(row, 1, QTableWidgetItem(doc_number))
+            
+            # تاريخها
+            self.docs_table.setItem(row, 2, QTableWidgetItem(doc[2] or ''))
+            
+            # جهة الإصدار
+            self.docs_table.setItem(row, 3, QTableWidgetItem(doc[4] or ''))
+            
+            # مضمونها
+            self.docs_table.setItem(row, 4, QTableWidgetItem(doc[3] or ''))
+            
+            # تصنيف الوثيقة
+            self.docs_table.setItem(row, 5, QTableWidgetItem(doc[5] or ''))
+            
+            # الفقرة القانونية
+            self.docs_table.setItem(row, 6, QTableWidgetItem(doc[6] or ''))
+        
+        self.update_pages_info()
+    
+    def get_table_data(self):
+        """جمع بيانات الجدول"""
+        data = []
+        for row in range(self.docs_table.rowCount()):
+            row_data = []
+            for col in range(self.docs_table.columnCount()):
+                item = self.docs_table.item(row, col)
+                row_data.append(item.text() if item else '')
+            data.append(row_data)
+        return data
+    
+    def split_data_into_pages(self, data):
+        """تقسيم البيانات إلى صفحات (25 صف لكل صفحة)"""
+        pages = []
+        for i in range(0, len(data), self.ROWS_PER_PAGE):
+            page_data = data[i:i + self.ROWS_PER_PAGE]
+            # إضافة صفوف فارغة إذا كانت الصفحة غير مكتملة
+            while len(page_data) < self.ROWS_PER_PAGE:
+                empty_row = [str(len(page_data) + 1 + i)] + [''] * 6
+                page_data.append(empty_row)
+            pages.append(page_data)
+        
+        # إذا لم تكن هناك بيانات، أنشئ صفحة فارغة
+        if not pages:
+            page_data = []
+            for j in range(self.ROWS_PER_PAGE):
+                page_data.append([str(j + 1)] + [''] * 6)
+            pages.append(page_data)
+        
+        return pages
+    
+    def generate_html_page(self, page_data, page_num, total_pages):
+        """إنشاء HTML لصفحة واحدة - مصممة لتناسب ورقة A4 واحدة"""
+        html = f'''
+        <div style="page-break-after: always; page-break-inside: avoid; direction: rtl; font-family: Arial, sans-serif; width: 100%; max-height: 270mm;">
+            <h3 style="text-align: center; margin: 0 0 5px 0; font-size: 14px; font-weight: bold;">استمارة إتلاف الوثائق</h3>
+            
+            <table style="width: 100%; margin-bottom: 3px; font-size: 9px; border: none;">
+                <tr>
+                    <td style="padding: 1px;">الوكالة: {self.agency_input.text()}</td>
+                    <td style="padding: 1px;">التشكيل أو المديرية: {self.directorate_input.text()}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 1px;">القسم: {self.section_input.text()}</td>
+                    <td style="padding: 1px;">الشعبة: {self.division_input.text()}</td>
+                </tr>
+            </table>
+            
+            <table style="width: 100%; border-collapse: collapse; font-size: 7px; table-layout: fixed;">
+                <tr style="background-color: #D9E1F2;">
+                    <th style="border: 1px solid #000; padding: 2px; text-align: center; width: 3%;">ت</th>
+                    <th style="border: 1px solid #000; padding: 2px; text-align: center; width: 8%;">رقم الوثيقة</th>
+                    <th style="border: 1px solid #000; padding: 2px; text-align: center; width: 10%;">تاريخها</th>
+                    <th style="border: 1px solid #000; padding: 2px; text-align: center; width: 12%;">جهة الإصدار</th>
+                    <th style="border: 1px solid #000; padding: 2px; text-align: center; width: 35%;">مضمونها</th>
+                    <th style="border: 1px solid #000; padding: 2px; text-align: center; width: 7%;">تصنيف</th>
+                    <th style="border: 1px solid #000; padding: 2px; text-align: center; width: 25%;">الفقرة القانونية</th>
+                </tr>
+        '''
+        
+        for row in page_data:
+            html += '<tr style="height: 8mm;">'
+            for cell in row:
+                html += f'<td style="border: 1px solid #000; padding: 1px; text-align: center; font-size: 7px;">{cell}</td>'
+            html += '</tr>'
+        
+        html += f'''
+            </table>
+            <div style="text-align: left; font-size: 7px; margin-top: 2px;">صفحة {page_num} من {total_pages}</div>
+        </div>
+        '''
+        return html
+    
+    def print_form(self):
+        """طباعة الاستمارة مع معاينة باستخدام QPainter"""
+        try:
+            from PyQt6.QtPrintSupport import QPrinter, QPrintPreviewDialog
+            from PyQt6.QtGui import QPageSize, QPageLayout
+            from PyQt6.QtCore import QMarginsF
+            
+            # جمع البيانات وتقسيمها
+            table_data = self.get_table_data()
+            self._print_pages = self.split_data_into_pages(table_data)
+            self._total_pages = len(self._print_pages)
+            
+            # حفظ معلومات النموذج
+            self._form_info = {
+                'agency': self.agency_input.text(),
+                'directorate': self.directorate_input.text(),
+                'section': self.section_input.text(),
+                'division': self.division_input.text()
+            }
+            
+            # إعداد الطابعة
+            printer = QPrinter(QPrinter.PrinterMode.HighResolution)
+            page_size = QPageSize(QPageSize.PageSizeId.A4)
+            page_layout = QPageLayout(page_size, QPageLayout.Orientation.Portrait, QMarginsF(15, 15, 15, 15))
+            printer.setPageLayout(page_layout)
+            
+            # إنشاء نافذة المعاينة
+            preview = QPrintPreviewDialog(printer, self)
+            preview.setWindowTitle(f'معاينة الطباعة - {self._total_pages} صفحة')
+            preview.setMinimumSize(800, 600)
+            
+            preview.paintRequested.connect(self._draw_pages_with_painter)
+            preview.exec()
+            
+        except Exception as e:
+            QMessageBox.critical(self, 'خطأ', f'حدث خطأ أثناء الطباعة:\n{str(e)}')
+    
+    def _draw_pages_with_painter(self, printer):
+        """رسم الصفحات باستخدام QPainter للتحكم الكامل"""
+        from PyQt6.QtGui import QPainter, QFont, QColor, QPen
+        from PyQt6.QtPrintSupport import QPrinter
+        from PyQt6.QtCore import Qt, QRectF
+        
+        painter = QPainter()
+        painter.begin(printer)
+        
+        # استخدام وحدة Millimeter للحصول على أبعاد حقيقية
+        page_rect = printer.pageRect(QPrinter.Unit.Millimeter)
+        width_mm = page_rect.width()
+        height_mm = page_rect.height()
+        
+        # تحويل من مليمتر إلى بكسل
+        dpi = printer.resolution()
+        px_per_mm = dpi / 25.4
+        
+        width = width_mm * px_per_mm
+        height = height_mm * px_per_mm
+        
+        # هوامش بالمليمتر ثم تحويلها
+        margin_mm = 10
+        margin = margin_mm * px_per_mm
+        content_width = width - (2 * margin)
+        
+        # ارتفاع الصف (حوالي 7mm للصف)
+        row_height = 7 * px_per_mm
+        
+        for page_idx, page_data in enumerate(self._print_pages):
+            if page_idx > 0:
+                printer.newPage()
+            
+            y_pos = margin
+            
+            # ===== الشعار (أعلى وسط) =====
+            import os
+            logo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "MOI.png")
+            if os.path.exists(logo_path):
+                from PyQt6.QtGui import QImage
+                logo = QImage(logo_path)
+                if not logo.isNull():
+                    # حجم الشعار المناسب
+                    logo_size = 25 * px_per_mm  # حوالي 25mm - أكبر وأجمل
+                    logo_x = margin + (content_width - logo_size) / 2  # وسط الصفحة
+                    logo_y = y_pos
+                    painter.drawImage(QRectF(logo_x, logo_y, logo_size, logo_size), logo)
+            
+            # ===== معلومات الوزارة (أعلى يمين) =====
+            ministry_font = QFont("Arial")
+            ministry_font.setPointSize(10)
+            ministry_font.setBold(True)
+            painter.setFont(ministry_font)
+            painter.setPen(Qt.GlobalColor.black)
+            
+            ministry_lines = [
+                "وزارة الداخلية",
+                "وكالة الوزارة لشؤون الإدارية والمالية",
+                "مديرية إدارة الموارد البشرية",
+                "مديرية السجلات والوثائق"
+            ]
+            
+            line_h = 5 * px_per_mm
+            temp_y = y_pos
+            for line in ministry_lines:
+                ministry_rect = QRectF(margin + content_width * 0.55, temp_y, content_width * 0.45, line_h)
+                painter.drawText(ministry_rect, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, line)
+                temp_y += line_h
+            
+            # ===== معلومات الإصدار (أعلى يسار) =====
+            version_font = QFont("Arial")
+            version_font.setPointSize(8)
+            painter.setFont(version_font)
+            
+            # رسم كل سطر بشكل منفصل (التسمية ثم / ثم القيمة)
+            version_data = [
+                ("رقم الإصدار", "0.1"),
+                ("سنة الإصدار", "2023"),
+                ("رقم الترميز", "م.ب-س"),
+                ("نموذج", "(37)")
+            ]
+            
+            inner_y = y_pos
+            for label, value in version_data:
+                # رسم القيمة أولاً (على اليسار)
+                val_rect = QRectF(margin, inner_y, 15 * px_per_mm, line_h)
+                painter.drawText(val_rect, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, value)
+                # رسم /
+                slash_rect = QRectF(margin + 15 * px_per_mm, inner_y, 3 * px_per_mm, line_h)
+                painter.drawText(slash_rect, Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter, "/")
+                # رسم التسمية (على اليمين)
+                lbl_rect = QRectF(margin + 18 * px_per_mm, inner_y, 25 * px_per_mm, line_h)
+                painter.drawText(lbl_rect, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, label)
+                inner_y += line_h
+            
+            y_pos = temp_y + 5 * px_per_mm
+            
+            # ===== العنوان الرئيسي (وسط) =====
+            title_font = QFont("Arial")
+            title_font.setPointSize(16)
+            title_font.setBold(True)
+            painter.setFont(title_font)
+            painter.setPen(Qt.GlobalColor.black)
+            
+            title_height = 10 * px_per_mm
+            title_rect = QRectF(margin, y_pos, content_width, title_height)
+            painter.drawText(title_rect, Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter, "استمارة إتلاف الوثائق")
+            y_pos += title_height + (4 * px_per_mm)
+            
+            # ===== معلومات النموذج =====
+            info_font = QFont("Arial")
+            info_font.setPointSize(10)
+            painter.setFont(info_font)
+            
+            # رسم كل حقل بشكل منفصل (التسمية ثم : ثم القيمة)
+            info_data = [
+                ("الوكالة", self._form_info['agency']),
+                ("التشكيل أو المديرية", self._form_info['directorate']),
+                ("القسم", self._form_info['section']),
+                ("الشعبة", self._form_info['division'])
+            ]
+            
+            line_height = 5 * px_per_mm
+            label_w = 32 * px_per_mm
+            
+            for label, value in info_data:
+                # رسم التسمية (على اليمين)
+                lbl_rect = QRectF(margin + content_width - label_w, y_pos, label_w, line_height)
+                painter.drawText(lbl_rect, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, label)
+                # رسم :
+                colon_rect = QRectF(margin + content_width - label_w - (4 * px_per_mm), y_pos, 4 * px_per_mm, line_height)
+                painter.drawText(colon_rect, Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter, ":")
+                # رسم القيمة
+                val_rect = QRectF(margin, y_pos, content_width - label_w - (6 * px_per_mm), line_height)
+                painter.drawText(val_rect, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, value)
+                y_pos += line_height
+            
+            y_pos += 3 * px_per_mm
+            
+            # ===== الجدول =====
+            col_widths = [0.04, 0.08, 0.10, 0.12, 0.34, 0.08, 0.24]
+            headers = ['ت', 'رقم الوثيقة', 'تاريخها', 'جهة الإصدار', 'مضمونها', 'تصنيف', 'الفقرة القانونية']
+            
+            # رسم رأس الجدول
+            header_font = QFont("Arial")
+            header_font.setPointSize(8)
+            header_font.setBold(True)
+            painter.setFont(header_font)
+            
+            # خلفية الرأس
+            painter.setBrush(QColor(217, 225, 242))
+            painter.setPen(QPen(Qt.GlobalColor.black, 1))
+            painter.drawRect(QRectF(margin, y_pos, content_width, row_height))
+            
+            # رسم خلايا الرأس من اليمين لليسار
+            x_pos = margin + content_width
+            for header, col_w in zip(headers, col_widths):
+                cell_width = content_width * col_w
+                x_pos -= cell_width
+                cell_rect = QRectF(x_pos, y_pos, cell_width, row_height)
+                painter.drawRect(cell_rect)
+                painter.drawText(cell_rect, Qt.AlignmentFlag.AlignCenter, header)
+            
+            y_pos += row_height
+            
+            # رسم صفوف البيانات
+            data_font = QFont("Arial")
+            data_font.setPointSize(7)
+            painter.setFont(data_font)
+            painter.setBrush(Qt.GlobalColor.white)
+            
+            for row_idx, row in enumerate(page_data, 1):
+                x_pos = margin + content_width
+                row_data = [str(row_idx)] + list(row[1:])
+                
+                for cell, col_w in zip(row_data, col_widths):
+                    cell_width = content_width * col_w
+                    x_pos -= cell_width
+                    cell_rect = QRectF(x_pos, y_pos, cell_width, row_height)
+                    painter.drawRect(cell_rect)
+                    display_text = str(cell)[:45] if len(str(cell)) > 45 else str(cell)
+                    painter.drawText(cell_rect.adjusted(2, 0, -2, 0), Qt.AlignmentFlag.AlignCenter, display_text)
+                
+                y_pos += row_height
+            
+            # ===== رقم الصفحة =====
+            page_font = QFont("Arial")
+            page_font.setPointSize(8)
+            painter.setFont(page_font)
+            page_num_text = f"صفحة {page_idx + 1} من {self._total_pages}"
+            page_rect_bottom = QRectF(margin, height - margin - (5 * px_per_mm), content_width, 5 * px_per_mm)
+            painter.drawText(page_rect_bottom, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, page_num_text)
+        
+        painter.end()
+    
+    def export_to_excel(self):
+        """تصدير إلى ملف Excel (مع تقسيم الصفحات)"""
+        try:
+            import openpyxl
+            from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
+        except ImportError:
+            QMessageBox.warning(self, 'خطأ', 'مكتبة openpyxl غير مثبتة!\nقم بتثبيتها: pip install openpyxl')
+            return
+        
+        # اختيار مكان الحفظ
+        file_path, _ = QFileDialog.getSaveFileName(
+            self, 'حفظ استمارة الإتلاف',
+            'استمارة_اتلاف_الوثائق.xlsx',
+            'Excel Files (*.xlsx)'
+        )
+        
+        if not file_path:
+            return
+        
+        try:
+            # جمع البيانات وتقسيمها
+            table_data = self.get_table_data()
+            pages = self.split_data_into_pages(table_data)
+            
+            wb = openpyxl.Workbook()
+            wb.remove(wb.active)  # إزالة الورقة الافتراضية
+            
+            # إعداد الأنماط
+            title_font = Font(size=16, bold=True)
+            header_font = Font(size=11, bold=True)
+            cell_font = Font(size=10)
+            center_align = Alignment(horizontal='center', vertical='center', wrap_text=True)
+            right_align = Alignment(horizontal='right', vertical='center')
+            thin_border = Border(
+                left=Side(style='thin'),
+                right=Side(style='thin'),
+                top=Side(style='thin'),
+                bottom=Side(style='thin')
+            )
+            header_fill = PatternFill(start_color='D9E1F2', end_color='D9E1F2', fill_type='solid')
+            
+            for page_num, page_data in enumerate(pages, 1):
+                ws = wb.create_sheet(title=f'صفحة {page_num}')
+                ws.sheet_view.rightToLeft = True
+                
+                # العنوان الرئيسي
+                ws.merge_cells('A1:G1')
+                ws['A1'] = 'استمارة إتلاف الوثائق'
+                ws['A1'].font = title_font
+                ws['A1'].alignment = center_align
+                ws.row_dimensions[1].height = 25
+                
+                # معلومات الرأس
+                ws['A3'] = f'الوكالة: {self.agency_input.text()}'
+                ws['A3'].alignment = right_align
+                ws.merge_cells('A3:G3')
+                
+                ws['A4'] = f'التشكيل أو المديرية: {self.directorate_input.text()}'
+                ws['A4'].alignment = right_align
+                ws.merge_cells('A4:G4')
+                
+                ws['A5'] = f'القسم: {self.section_input.text()}'
+                ws['A5'].alignment = right_align
+                ws.merge_cells('A5:G5')
+                
+                ws['A6'] = f'الشعبة: {self.division_input.text()}'
+                ws['A6'].alignment = right_align
+                ws.merge_cells('A6:G6')
+                
+                # رقم الصفحة
+                ws['G7'] = f'صفحة {page_num} من {len(pages)}'
+                ws['G7'].alignment = Alignment(horizontal='left', vertical='center')
+                
+                # رؤوس الجدول
+                headers = ['ت', 'رقم الوثيقة', 'تاريخها', 'جهة الإصدار', 'مضمونها', 'تصنيف\n(أ،ب،ج)', 'الفقرة القانونية']
+                header_row = table.rows[0]
+                for idx, header in enumerate(headers):
+                    cell = header_row.cells[idx]
+                    cell.text = header
+                    cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+                    for run in cell.paragraphs[0].runs:
+                        run.bold = True
+                        run.font.size = Pt(9)
+                
+                # عرض الأعمدة
+                ws.column_dimensions['A'].width = 5
+                ws.column_dimensions['B'].width = 12
+                ws.column_dimensions['C'].width = 12
+                ws.column_dimensions['D'].width = 18
+                ws.column_dimensions['E'].width = 30
+                ws.column_dimensions['F'].width = 10
+                ws.column_dimensions['G'].width = 25
+                
+                # بيانات الجدول
+                for row_idx, row_data in enumerate(page_data):
+                    for col_idx, value in enumerate(row_data):
+                        cell = ws.cell(row=row_idx + 1, column=col_idx, value=value)
+                        cell.font = cell_font
+                        cell.alignment = center_align
+                        cell.border = thin_border
+            
+            wb.save(file_path)
+            QMessageBox.information(self, 'نجح', f'تم تصدير {len(pages)} صفحة إلى:\n{file_path}')
+            os.startfile(file_path)
+            
+        except Exception as e:
+            QMessageBox.critical(self, 'خطأ', f'حدث خطأ أثناء التصدير:\n{str(e)}')
+    
+    def export_to_word(self):
+        """تصدير إلى ملف Word (مع تقسيم الصفحات)"""
+        try:
+            from docx import Document
+            from docx.shared import Inches, Pt, Cm
+            from docx.enum.text import WD_ALIGN_PARAGRAPH
+            from docx.enum.table import WD_TABLE_ALIGNMENT
+            from docx.oxml.ns import qn
+            from docx.oxml import OxmlElement
+        except ImportError:
+            QMessageBox.warning(self, 'خطأ', 'مكتبة python-docx غير مثبتة!\nقم بتثبيتها: pip install python-docx')
+            return
+        
+        # اختيار مكان الحفظ
+        file_path, _ = QFileDialog.getSaveFileName(
+            self, 'حفظ استمارة الإتلاف',
+            'استمارة_اتلاف_الوثائق.docx',
+            'Word Files (*.docx)'
+        )
+        
+        if not file_path:
+            return
+        
+        try:
+            # جمع البيانات وتقسيمها
+            table_data = self.get_table_data()
+            pages = self.split_data_into_pages(table_data)
+            
+            doc = Document()
+            
+            for page_num, page_data in enumerate(pages, 1):
+                # تعيين اتجاه المستند من اليمين لليسار
+                if page_num == 1:
+                    section = doc.sections[0]
+                else:
+                    section = doc.add_section()
+                
+                sectPr = section._sectPr
+                bidi = OxmlElement('w:bidi')
+                bidi.set(qn('w:val'), '1')
+                sectPr.append(bidi)
+                
+                # العنوان
+                title = doc.add_paragraph('استمارة إتلاف الوثائق')
+                title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                title.runs[0].bold = True
+                title.runs[0].font.size = Pt(16)
+                
+                # معلومات الرأس
+                doc.add_paragraph(f'الوكالة: {self.agency_input.text()}')
+                doc.add_paragraph(f'التشكيل أو المديرية: {self.directorate_input.text()}')
+                doc.add_paragraph(f'القسم: {self.section_input.text()}')
+                doc.add_paragraph(f'الشعبة: {self.division_input.text()}')
+                
+                # رقم الصفحة
+                page_info = doc.add_paragraph(f'صفحة {page_num} من {len(pages)}')
+                page_info.alignment = WD_ALIGN_PARAGRAPH.LEFT
+                
+                # الجدول
+                table = doc.add_table(rows=len(page_data) + 1, cols=7)
+                table.style = 'Table Grid'
+                table.alignment = WD_TABLE_ALIGNMENT.CENTER
+                
+                # رؤوس الجدول
+                headers = ['ت', 'رقم الوثيقة', 'تاريخها', 'جهة الإصدار', 'مضمونها', 'تصنيف\n(أ،ب،ج)', 'الفقرة القانونية']
+                header_row = table.rows[0]
+                for idx, header in enumerate(headers):
+                    cell = header_row.cells[idx]
+                    cell.text = header
+                    cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+                    for run in cell.paragraphs[0].runs:
+                        run.bold = True
+                        run.font.size = Pt(9)
+                
+                # بيانات الجدول
+                for row_idx, row_data in enumerate(page_data):
+                    row = table.rows[row_idx + 1]
+                    for col_idx, value in enumerate(row_data):
+                        cell = row.cells[col_idx]
+                        cell.text = value
+                        cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+                        for run in cell.paragraphs[0].runs:
+                            run.font.size = Pt(9)
+                
+                # إضافة فاصل صفحة إذا لم تكن آخر صفحة
+                if page_num < len(pages):
+                    doc.add_page_break()
+            
+            doc.save(file_path)
+            QMessageBox.information(self, 'نجح', f'تم تصدير {len(pages)} صفحة إلى:\n{file_path}')
+            os.startfile(file_path)
+            
+        except Exception as e:
+            QMessageBox.critical(self, 'خطأ', f'حدث خطأ أثناء التصدير:\n{str(e)}')
+
+
 class MainWindow(QMainWindow):
     """النافذة الرئيسية للتطبيق"""
     
@@ -1304,6 +1997,10 @@ class MainWindow(QMainWindow):
         delete_btn = QPushButton('🗑️ حذف')
         delete_btn.clicked.connect(self.delete_document)
         toolbar_layout.addWidget(delete_btn)
+        
+        destruction_form_btn = QPushButton('📋 استمارة إتلاف')
+        destruction_form_btn.clicked.connect(self.open_destruction_form)
+        toolbar_layout.addWidget(destruction_form_btn)
         
         toolbar_layout.addStretch()
         
@@ -1786,16 +2483,28 @@ class MainWindow(QMainWindow):
                             print(f"[OCR ERROR] خطأ في الصورة {img_idx + 1}: {str(e)}")
                             continue
                 
-                # تحقق من وجود الوثيقة بنفس الاسم
-                existing = self.db.search_documents(doc_info['data']['doc_name'], 'doc_name')
+                # استخراج رقم الوثيقة من الاسم (الجزء قبل كلمة "في")
+                doc_name_parts = doc_info['data']['doc_name'].split(' في ')
+                doc_number = doc_name_parts[0].strip() if doc_name_parts else ''
+                doc_date = doc_info['data']['doc_date']
+                
+                print(f"[DEBUG] البحث عن وثيقة: رقم={doc_number}, تاريخ={doc_date}, اسم={doc_info['data']['doc_name']}")
+                
+                # تحقق من وجود الوثيقة بنفس الرقم والتاريخ
+                existing = None
+                if doc_number and doc_date:
+                    existing = self.db.find_document_by_number_and_date(doc_number, doc_date)
+                    print(f"[DEBUG] نتيجة البحث: {len(existing) if existing else 0} وثيقة")
                 
                 if existing:
                     doc_id = existing[0][0]
+                    print(f"[DEBUG] تم إيجاد وثيقة موجودة: ID={doc_id}")
                     # تحديث المضمون إذا تم استخراجه
                     if doc_title:
                         self.db.update_document(doc_id, doc_title=doc_title)
                 else:
                     # أنشئ وثيقة جديدة
+                    print(f"[DEBUG] إنشاء وثيقة جديدة...")
                     doc_id = self.db.add_document(
                         doc_info['data']['doc_name'],
                         doc_info['data']['doc_date'],
@@ -1804,9 +2513,14 @@ class MainWindow(QMainWindow):
                         doc_info['data']['doc_classification'],
                         doc_info['data']['legal_paragraph']
                     )
+                    print(f"[DEBUG] تم إنشاء وثيقة جديدة: ID={doc_id}")
+                
+                # الحصول على عدد الصور الموجودة مسبقاً في الوثيقة
+                existing_images = self.db.get_document_images(doc_id)
+                start_img_idx = len(existing_images) + 1  # البدء من بعد آخر صورة
                 
                 # حفظ الصور
-                for img_idx, img_info in enumerate(doc_info['images'], 1):
+                for img_idx, img_info in enumerate(doc_info['images'], start_img_idx):
                     if progress.wasCanceled():
                         break
                     
@@ -1952,6 +2666,25 @@ class MainWindow(QMainWindow):
             self.db.delete_document(doc_id)
             QMessageBox.information(self, 'نجح', 'تم حذف الوثيقة')
             self.load_documents()
+    
+    def open_destruction_form(self):
+        """فتح نافذة استمارة إتلاف الوثائق"""
+        # الحصول على الوثائق المحددة
+        selected_docs = []
+        for row in range(self.documents_table.rowCount()):
+            checkbox = self.documents_table.cellWidget(row, 0)
+            if checkbox and checkbox.isChecked():
+                doc_id_item = self.documents_table.item(row, 1)
+                if doc_id_item:
+                    doc_id = doc_id_item.data(Qt.ItemDataRole.UserRole)
+                    if doc_id:
+                        doc = self.db.get_document_by_id(doc_id)
+                        if doc:
+                            selected_docs.append(doc)
+        
+        # فتح النافذة
+        dialog = DestructionFormDialog(self, self.db, selected_docs)
+        dialog.exec()
     
     def select_all_documents(self):
         """تحديد جميع الوثائق"""

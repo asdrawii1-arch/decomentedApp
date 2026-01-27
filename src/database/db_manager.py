@@ -119,6 +119,50 @@ class DatabaseManager:
         
         return results
     
+    def find_document_exact(self, doc_name):
+        """البحث عن وثيقة بالاسم الدقيق (مطابقة تامة)"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        cursor.execute('SELECT * FROM documents WHERE doc_name = ?', (doc_name,))
+        
+        results = cursor.fetchall()
+        conn.close()
+        
+        return results
+    
+    def find_document_by_number(self, doc_number):
+        """البحث عن وثيقة برقم الوثيقة فقط (البحث في بداية اسم الوثيقة)"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        # البحث عن الوثائق التي تبدأ برقم معين متبوعاً بمسافة
+        cursor.execute('SELECT * FROM documents WHERE doc_name LIKE ?', (f'{doc_number} %',))
+        
+        results = cursor.fetchall()
+        conn.close()
+        
+        return results
+    
+    def find_document_by_number_and_date(self, doc_number, doc_date):
+        """البحث عن وثيقة برقم الوثيقة والتاريخ (للتحقق من التكرار عند الاستيراد)"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        # البحث عن الوثائق التي تحتوي على الرقم والتاريخ في اسم الوثيقة
+        # الصيغة المتوقعة: "رقم في تاريخ"
+        doc_name_pattern = f'{doc_number} في {doc_date}'
+        
+        cursor.execute('''
+            SELECT * FROM documents 
+            WHERE doc_name = ? OR doc_name LIKE ?
+        ''', (doc_name_pattern, f'{doc_name_pattern}%'))
+        
+        results = cursor.fetchall()
+        conn.close()
+        
+        return results
+    
     def search_documents_and_attachments(self, search_term, search_field='doc_name'):
         """البحث عن الوثائق والمرفقات"""
         conn = sqlite3.connect(self.db_path)
