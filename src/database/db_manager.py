@@ -275,6 +275,18 @@ class DatabaseManager:
         results = cursor.fetchall()
         conn.close()
         return results
+
+    def get_document_ids_by_image_year(self, year):
+        """إرجاع قائمة معرفات الوثائق التي تحتوي صورها داخل مجلد السنة المحدد"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        # دعم كل من الفواصل \ و /
+        pattern1 = f'%documents/{year}/%'
+        pattern2 = f'%documents\\{year}\\%'
+        cursor.execute('SELECT DISTINCT document_id FROM images WHERE image_path LIKE ? OR image_path LIKE ?', (pattern1, pattern2))
+        rows = cursor.fetchall()
+        conn.close()
+        return [r[0] for r in rows]
     
     def update_document(self, doc_id, doc_name=None, doc_date=None, doc_title=None, 
                        issuing_dept=None, doc_classification=None, legal_paragraph=None):

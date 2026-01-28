@@ -49,6 +49,33 @@ except ImportError:
     print("[WARNING] مكتبة easyocr غير مثبتة - ميزة استخراج المضمون غير متاحة")
 
 
+def choose_year_folder(parent):
+    """دالة مساعدة لعرض مجلدات السنوات الموجودة أو إنشاء مجلد سنة جديدة.
+    ترجع المسار كسلسلة أو None إذا ألغاها المستخدم.
+    """
+    from pathlib import Path
+    from PyQt6.QtWidgets import QInputDialog, QMessageBox
+    documents_path = Path('documents')
+    documents_path.mkdir(exist_ok=True)
+    years = sorted([f.name for f in documents_path.iterdir() if f.is_dir() and f.name.isdigit()], reverse=True)
+    year, ok = QInputDialog.getItem(parent, 'اختر السنة', 'السنة:', years + ['سنة جديدة...'], 0, False)
+    if not ok:
+        return None
+    if year == 'سنة جديدة...':
+        new_year, ok2 = QInputDialog.getText(parent, 'سنة جديدة', 'أدخل السنة:')
+        if ok2 and new_year.isdigit():
+            year_folder = documents_path / new_year
+            year_folder.mkdir(exist_ok=True)
+            QMessageBox.information(parent, 'مجلد السنة', f'تم إنشاء/اختيار مجلد السنة: {year_folder}')
+            return str(year_folder)
+        else:
+            return None
+    else:
+        year_folder = documents_path / year
+        QMessageBox.information(parent, 'مجلد السنة', f'المجلد المختار: {year_folder}')
+        return str(year_folder)
+
+
 class AttachmentDetailsDialog(QDialog):
     """نافذة بسيطة لإدخال معلومات المرفقات مع معاينة الصور"""
     
@@ -303,6 +330,27 @@ class AttachmentDetailsDialog(QDialog):
 
 
 class AddDocumentDialog(QDialog):
+    def select_year_folder(self):
+        """عرض مجلدات السنوات الموجودة أو إنشاء مجلد سنة جديدة"""
+        from pathlib import Path
+        import os
+        documents_path = Path('documents')
+        years = [f.name for f in documents_path.iterdir() if f.is_dir() and f.name.isdigit()]
+        from PyQt6.QtWidgets import QInputDialog
+        year, ok = QInputDialog.getItem(self, 'اختر السنة', 'السنة:', years + ['سنة جديدة...'], 0, False)
+        if ok:
+            if year == 'سنة جديدة...':
+                new_year, ok2 = QInputDialog.getText(self, 'سنة جديدة', 'أدخل السنة:')
+                if ok2 and new_year.isdigit():
+                    year_folder = documents_path / new_year
+                    year_folder.mkdir(exist_ok=True)
+                    return str(year_folder)
+                else:
+                    return None
+            else:
+                return str(documents_path / year)
+        return None
+
     """نافذة حوار لإضافة وثيقة جديدة"""
     
     def __init__(self, parent=None, db=None, image_manager=None):
@@ -445,6 +493,12 @@ class AddDocumentDialog(QDialog):
             return
         
         try:
+            # اطلب من المستخدم اختيار مجلد السنة قبل المسح
+            year_folder = choose_year_folder(self)
+            if not year_folder:
+                return
+            self.selected_year_folder = year_folder
+
             QMessageBox.information(
                 self, 'جاري المسح',
                 'سيتم فتح نافذة السكانر\n\nضع الوثيقة واضغط Scan'
@@ -489,19 +543,26 @@ class AddDocumentDialog(QDialog):
             )
     
     def _select_image_file(self):
-        """اختيار صورة من الحاسب كبديل للسكانر"""
+        """اختيار صورة من الحاسب كبديل للسكانر مع اختيار مجلد السنة"""
         file_path, _ = QFileDialog.getOpenFileName(
             self, 'اختر صورة الوثيقة',
             '', 'صور (*.jpg *.jpeg *.png *.tiff *.bmp);;جميع الملفات (*)'
         )
-        
         if file_path:
-            self.scanned_image_path = file_path
-            self.scanned_images = [file_path]
+            year_folder = self.select_year_folder()
+            if not year_folder:
+                QMessageBox.warning(self, 'تنبيه', 'يجب اختيار أو إنشاء مجلد سنة')
+                return
+            import os, shutil
+            basename = os.path.basename(file_path)
+            dest_path = os.path.join(year_folder, basename)
+            shutil.copy2(file_path, dest_path)
+            self.scanned_image_path = dest_path
+            self.scanned_images = [dest_path]
             self._update_images_count()
             QMessageBox.information(
                 self, 'تم ✅',
-                'تم اختيار الصورة بنجاح!\n\nأدخل المعلومات يدوياً في الحقول أدناه'
+                f'تم اختيار الصورة بنجاح!\n\nتم نقلها إلى مجلد السنة: {year_folder}\nأدخل المعلومات يدوياً في الحقول أدناه'
             )
     
     def _select_multiple_image_files(self):
@@ -909,10 +970,16 @@ class AddDocumentDialog(QDialog):
                 'للمسح السريع: استخدم "مسح من السكانر (إدخال يدوي)"',
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
             )
-            
+
             if reply != QMessageBox.StandardButton.Yes:
                 return
-            
+
+            # اطلب من المستخدم اختيار مجلد السنة قبل المسح
+            year_folder = choose_year_folder(self)
+            if not year_folder:
+                return
+            self.selected_year_folder = year_folder
+
             QMessageBox.information(
                 self, 'جاري المسح',
                 'سيتم فتح نافذة السكانر\n\nضع الوثيقة في السكانر واضغط Scan'
@@ -1009,8 +1076,39 @@ class AddDocumentDialog(QDialog):
             )
             
             if image_path and os.path.exists(image_path):
-                saved_path = self.image_manager.save_image(image_path, doc_id, 1)
-                self.db.add_image(doc_id, saved_path, os.path.basename(image_path), 1, None, 1, None)
+                # استخدم مجلد السنة المختار مسبقاً إذا وُجد، وإلا اطلبه الآن
+                year_folder = getattr(self, 'selected_year_folder', None)
+                if not year_folder:
+                    year_folder = choose_year_folder(self)
+                if not year_folder:
+                    QMessageBox.warning(self, 'تنبيه', 'يجب اختيار أو إنشاء مجلد سنة لحفظ الصورة')
+                    return
+
+                # انسخ الصورة الممسوحة إلى مجلد مؤقت داخل مجلد السنة حتى يتعرف ImageManager على السنة
+                import shutil, os
+                incoming_dir = os.path.join(year_folder, '_incoming')
+                os.makedirs(incoming_dir, exist_ok=True)
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_%f')
+                basename = os.path.basename(image_path)
+                temp_name = f"{timestamp}_{basename}"
+                temp_dest = os.path.join(incoming_dir, temp_name)
+                shutil.copy2(image_path, temp_dest)
+
+                # احفظ الصورة باستخدام ImageManager (سيضعها ضمن مجلد السنة تلقائياً)
+                # مرّر اسم السنة إلى ImageManager لتأكيد الحفظ داخل مجلد السنة
+                try:
+                    year_name = Path(year_folder).name
+                except Exception:
+                    year_name = None
+                saved_path = self.image_manager.save_image(temp_dest, doc_id, 1, year=year_name)
+                # أضف إلى قاعدة البيانات
+                self.db.add_image(doc_id, saved_path, basename, 1, None, 1, None)
+
+                # حذف الملف المؤقت في incoming
+                try:
+                    os.remove(temp_dest)
+                except Exception:
+                    pass
             
             QMessageBox.information(
                 self, 'تم الحفظ ✅',
@@ -1053,7 +1151,8 @@ class AddDocumentDialog(QDialog):
             'sides': self.sides.value(),
             'scanned_image': self.scanned_image_path,
             'scanned_images': self.scanned_images,
-            'attachment_details_dict': att_dict
+            'attachment_details_dict': att_dict,
+            'selected_year_folder': getattr(self, 'selected_year_folder', None)
         }
 
 
@@ -1129,8 +1228,28 @@ class ImportImagesDialog(QDialog):
         )
         
         if files:
-            self.selected_files = files
-            self.update_list()
+            # اطلب من المستخدم اختيار مجلد السنة لحفظ الصور المختارة
+            year_folder = choose_year_folder(self)
+            if not year_folder:
+                QMessageBox.warning(self, 'تنبيه', 'يجب اختيار أو إنشاء مجلد سنة')
+                return
+
+            import os, shutil
+            dest_files = []
+            for f in files:
+                try:
+                    basename = os.path.basename(f)
+                    dest = os.path.join(year_folder, basename)
+                    shutil.copy2(f, dest)
+                    dest_files.append(dest)
+                except Exception as e:
+                    print(f"خطأ في نسخ الملف {f}: {e}")
+
+            if dest_files:
+                self.selected_files = dest_files
+                self.update_list()
+            else:
+                QMessageBox.warning(self, 'تنبيه', 'لم يتم نسخ أي ملفات')
     
     def select_folder(self):
         """اختيار مجلد كامل والبحث عن جميع الصور فيه"""
@@ -1140,35 +1259,51 @@ class ImportImagesDialog(QDialog):
         )
         
         if folder:
+            # اختر/أنشئ مجلد السنة أولاً
+            year_folder = choose_year_folder(self)
+            if not year_folder:
+                QMessageBox.warning(self, 'تنبيه', 'يجب اختيار أو إنشاء مجلد سنة')
+                return
+
             # البحث عن جميع الصور في المجلد والمجلدات الفرعية
             from pathlib import Path
+            import shutil, os
             folder_path = Path(folder)
-            
             image_extensions = {'.jpg', '.jpeg', '.png', '.tiff', '.bmp', '.gif', '.webp'}
             files = []
-            
+
             # البحث في المجلد الحالي والمجلدات الفرعية
             for ext in image_extensions:
-                # البحث في المجلد الحالي فقط
                 files.extend([str(f) for f in folder_path.glob(f'*{ext}')])
                 files.extend([str(f) for f in folder_path.glob(f'*{ext.upper()}')])
-                
-                # البحث في المجلدات الفرعية أيضاً
                 files.extend([str(f) for f in folder_path.glob(f'**/*{ext}')])
                 files.extend([str(f) for f in folder_path.glob(f'**/*{ext.upper()}')])
-            
+
             if files:
                 # إزالة التكرارات والترتيب
-                self.selected_files = sorted(list(set(files)))
-                
+                found_files = sorted(list(set(files)))
+
+                # نسخ الملفات إلى مجلد السنة
+                dest_files = []
+                for fp in found_files:
+                    try:
+                        basename = os.path.basename(fp)
+                        dest = os.path.join(year_folder, basename)
+                        shutil.copy2(fp, dest)
+                        dest_files.append(dest)
+                    except Exception:
+                        pass
+
+                self.selected_files = dest_files
+
                 # إظهار عدد الصور المكتشفة
                 count = len(self.selected_files)
                 QMessageBox.information(
                     self,
-                    'تم العثور على صور',
-                    f'تم العثور على {count} صورة\nسيتم استيراد جميعها'
+                    'تم الاستيراد',
+                    f'تم استيراد {count} صورة إلى مجلد السنة: {year_folder}'
                 )
-                
+
                 self.update_list()
             else:
                 QMessageBox.warning(self, 'تنبيه', 'لم يتم العثور على صور في المجلد')
@@ -2016,7 +2151,16 @@ class MainWindow(QMainWindow):
         refresh_btn.clicked.connect(self.load_documents)
         toolbar_layout.addWidget(refresh_btn)
         main_layout.addLayout(toolbar_layout)
-        
+
+        # محتوى رئيسي: قائمة السنوات على اليسار والجدول على اليمين
+        content_layout = QHBoxLayout()
+
+        # قائمة السنوات
+        self.years_list = QListWidget()
+        self.years_list.setMaximumWidth(220)
+        self.years_list.itemClicked.connect(self.on_year_selected)
+        content_layout.addWidget(self.years_list)
+
         # جدول الوثائق
         self.documents_table = QTableWidget()
         self.documents_table.setColumnCount(8)
@@ -2035,19 +2179,35 @@ class MainWindow(QMainWindow):
         self.documents_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.documents_table.setSelectionMode(QTableWidget.SelectionMode.MultiSelection)
         
-        main_layout.addWidget(self.documents_table)
-        
+        # ضع الجدول داخل تخطيط عمودي (للسماح بعناصر إضافية إن لزم)
+        right_layout = QVBoxLayout()
+        right_layout.addWidget(self.documents_table)
+        content_layout.addLayout(right_layout)
+
+        main_layout.addLayout(content_layout)
+
         central_widget.setLayout(main_layout)
     
-    def load_documents(self):
-        """تحميل قائمة الوثائق"""
+    def load_documents(self, year_filter=None):
+        """تحميل قائمة الوثائق. إذا تم تمرير `year_filter` (مثل '2025')، يعرض الوثائق المرتبطة بتلك السنة فقط."""
+        # تحديث قائمة السنوات
+        self.refresh_years()
+
         self.documents_table.setRowCount(0)
         documents = self.db.get_all_documents()
+
+        # إذا تم تحديد سنة، احصل على معرفات الوثائق التي تحتوي صورها في مجلد تلك السنة
+        filter_ids = None
+        if year_filter:
+            filter_ids = set(self.db.get_document_ids_by_image_year(year_filter))
         
         # Disable updates for better performance
         self.documents_table.setUpdatesEnabled(False)
         
         for idx, doc in enumerate(documents):
+            # إذا يوجد فلتر سنة وتوثيقة غير موجودة ضمن تلك السنة، تجاهلها
+            if filter_ids is not None and doc[0] not in filter_ids:
+                continue
             row = self.documents_table.rowCount()
             self.documents_table.insertRow(row)
             
@@ -2089,6 +2249,28 @@ class MainWindow(QMainWindow):
         
         # Re-enable updates
         self.documents_table.setUpdatesEnabled(True)
+
+    def refresh_years(self):
+        """تحديث قائمة السنوات من مجلد `documents/`"""
+        from pathlib import Path
+        import os
+        docs_dir = Path(self.image_manager.storage_dir)
+        self.years_list.clear()
+        # إضافة خيار عرض الكل
+        all_item = QListWidgetItem('الكل')
+        self.years_list.addItem(all_item)
+        if docs_dir.exists():
+            for d in sorted(docs_dir.iterdir()):
+                if d.is_dir() and d.name.isdigit():
+                    item = QListWidgetItem(d.name)
+                    self.years_list.addItem(item)
+
+    def on_year_selected(self, item):
+        text = item.text()
+        if text == 'الكل':
+            self.load_documents(None)
+        else:
+            self.load_documents(text)
     
     def add_document(self):
         """إضافة وثيقة جديدة"""
@@ -2121,7 +2303,15 @@ class MainWindow(QMainWindow):
             
             if scanned_images:
                 saved_count = 0
-                
+                # استخلاص مجلد السنة إن اختاره المستخدم في الحوار
+                selected_year = None
+                year_folder = data.get('selected_year_folder')
+                try:
+                    from pathlib import Path
+                    selected_year = Path(year_folder).name if year_folder else None
+                except Exception:
+                    selected_year = None
+
                 # enumerate(scanned_images, 0) -> idx يبدأ من 0
                 # scanned_images[0] = الصورة الأولى = الوثيقة الرئيسية
                 # scanned_images[1] = الصورة الثانية = المرفق الأول -> attachment_details_dict[1]
@@ -2211,7 +2401,8 @@ class MainWindow(QMainWindow):
                             saved_path = self.image_manager.save_image(
                                 image_path,
                                 doc_id,
-                                idx + 1  # page_number يبدأ من 1
+                                idx + 1,  # page_number يبدأ من 1
+                                year=selected_year
                             )
                             
                             print(f"[DEBUG] ✅ حفظ الصورة {idx} بـ notes: {notes_text}")
@@ -2241,10 +2432,20 @@ class MainWindow(QMainWindow):
             elif data.get('scanned_image') and os.path.exists(data['scanned_image']):
                 # حفظ صورة واحدة فقط (للتوافق مع الكود القديم)
                 try:
+                    # استخلاص السنة ولوحة المستخدم
+                    selected_year = None
+                    year_folder = data.get('selected_year_folder')
+                    try:
+                        from pathlib import Path
+                        selected_year = Path(year_folder).name if year_folder else None
+                    except Exception:
+                        selected_year = None
+
                     saved_path = self.image_manager.save_image(
                         data['scanned_image'],
                         doc_id,
-                        1
+                        1,
+                        year=selected_year
                     )
                     
                     self.db.add_image(

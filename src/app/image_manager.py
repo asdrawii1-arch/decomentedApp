@@ -12,12 +12,12 @@ class ImageManager:
     """مدير الصور والملفات"""
     
     def __init__(self, storage_dir='documents'):
-        self.storage_dir = Path(storage_dir)
+        self.storage_dir = Path(storage_dir).resolve()
         self.storage_dir.mkdir(exist_ok=True)
         self.thumbnails_dir = self.storage_dir / 'thumbnails'
         self.thumbnails_dir.mkdir(exist_ok=True)
     
-    def save_image(self, source_path, document_id, image_number=None):
+    def save_image(self, source_path, document_id, image_number=None, year=None):
         """
         حفظ الصورة في مجلد التخزين
         
@@ -29,10 +29,33 @@ class ImageManager:
         Returns:
             str: مسار الملف المحفوظ
         """
-        source_path = Path(source_path)
+        source_path = Path(source_path).resolve()
         
-        # إنشاء مجلد للوثيقة
-        doc_dir = self.storage_dir / f'doc_{document_id}'
+        # تحديد مجلد السنة: يستعمل الوسيطة `year` إن وُجدت، وإلا يحاول استخلاصها من مسار المصدر
+        year_dir = None
+        if year:
+            try:
+                year_dir = str(year)
+            except Exception:
+                year_dir = None
+        else:
+            try:
+                for p in source_path.parents:
+                    try:
+                        if p.parent.resolve() == self.storage_dir and p.name.isdigit():
+                            year_dir = p.name
+                            break
+                    except Exception:
+                        continue
+            except Exception:
+                year_dir = None
+
+        # إنشاء مجلد للوثيقة (ضمن مجلد السنة إذا وُجدت)
+        if year_dir:
+            doc_dir = self.storage_dir / year_dir / f'doc_{document_id}'
+            (self.storage_dir / year_dir).mkdir(exist_ok=True)
+        else:
+            doc_dir = self.storage_dir / f'doc_{document_id}'
         doc_dir.mkdir(exist_ok=True)
         
         # تحديد اسم الملف
@@ -49,7 +72,7 @@ class ImageManager:
         # إنشاء صورة مصغرة
         self.create_thumbnail(dest_path)
         
-        return str(dest_path)
+        return str(dest_path.resolve())
     
     def create_thumbnail(self, image_path, size=(150, 200)):
         """
