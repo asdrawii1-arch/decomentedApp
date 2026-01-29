@@ -48,23 +48,19 @@ class OCRExtractor:
             if img.mode != 'RGB':
                 img = img.convert('RGB')
             
-            # تكبير الصورة إذا كانت صغيرة
+            # تكبير معتدل للصورة إذا كانت صغيرة (لتقليل زمن المعالجة)
             width, height = img.size
-            if width < 2000:
-                scale = 2000 / width
+            if width < 1500:
+                scale = 1500 / width
                 new_size = (int(width * scale), int(height * scale))
                 img = img.resize(new_size, Image.Resampling.LANCZOS)
-            
-            # تحويل إلى تدرج الرمادي
+
+            # تحويل إلى تدرج الرمادي وخفض الخطوات الثقيلة لتحسين السرعة
             img = img.convert('L')
-            
-            # زيادة التباين
+
+            # تعادل معقول للتباين
             enhancer = ImageEnhance.Contrast(img)
-            img = enhancer.enhance(1.5)
-            
-            # زيادة الحدة
-            enhancer = ImageEnhance.Sharpness(img)
-            img = enhancer.enhance(2.0)
+            img = enhancer.enhance(1.2)
             
             return img
             
@@ -79,10 +75,10 @@ class OCRExtractor:
             if img.mode != 'RGB':
                 img = img.convert('RGB')
             
-            # تكبير الصورة فقط
+            # تكبير معتدل فقط لتسريع المعالجة
             width, height = img.size
-            if width < 1500:
-                scale = 1500 / width
+            if width < 1200:
+                scale = 1200 / width
                 new_size = (int(width * scale), int(height * scale))
                 img = img.resize(new_size, Image.Resampling.LANCZOS)
             
@@ -95,41 +91,44 @@ class OCRExtractor:
         """استخراج النصوص من الصورة - محاولة عدة طرق"""
         if not self.reader:
             return None
-        
+        # محاولة سريعة أولاً: معالجة خفيفة ونص سريع
+        try:
+            img_fast = self._preprocess_image_v2(image_path)
+            fast_text = pytesseract.image_to_string(img_fast, config='--oem 3 --psm 6 -l ara+eng')
+            if fast_text:
+                # إذا وجدنا كلمة الموضوع مباشرة فانسداد مبكر
+                if 'الموضوع' in fast_text or 'موضوع' in fast_text:
+                    return fast_text
+                # إذا كان هناك كمية معتبرة من النص العربي نعتبرها كافية
+                arabic_count = len(re.findall(r'[\u0600-\u06FF]', fast_text))
+                if arabic_count > 20:
+                    return fast_text
+        except Exception:
+            pass
+
+        # محاولات إضافية مقتصرة لتقليل الزمن الكلي
         best_text = ""
         best_arabic_count = 0
-        
-        # قائمة الإعدادات المختلفة للمحاولة
         configs = [
-            ('--oem 3 --psm 6 -l ara+eng', self._preprocess_image_v1),
+            ('--oem 3 --psm 6 -l ara', self._preprocess_image_v1),
             ('--oem 3 --psm 3 -l ara+eng', self._preprocess_image_v1),
-            ('--oem 3 --psm 6 -l ara', self._preprocess_image_v2),
-            ('--oem 3 --psm 4 -l ara+eng', self._preprocess_image_v2),
         ]
-        
+
         for config, preprocess_func in configs:
             try:
                 img = preprocess_func(image_path)
                 text = pytesseract.image_to_string(img, config=config)
-                
-                # حساب عدد الأحرف العربية
                 arabic_count = len(re.findall(r'[\u0600-\u06FF]', text))
-                
-                # البحث عن كلمة "الموضوع" - أولوية عالية
                 has_subject = 'الموضوع' in text or 'موضوع' in text
-                
-                # اختيار أفضل نتيجة
+
                 if has_subject and arabic_count > best_arabic_count * 0.7:
+                    return text
+                if arabic_count > best_arabic_count:
                     best_text = text
                     best_arabic_count = arabic_count
-                    break  # وجدنا "الموضوع"، توقف
-                elif arabic_count > best_arabic_count:
-                    best_text = text
-                    best_arabic_count = arabic_count
-                    
-            except Exception as e:
+            except Exception:
                 continue
-        
+
         return best_text if best_text else None
     
     def extract_document_info(self, image_path):

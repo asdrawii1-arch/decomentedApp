@@ -331,25 +331,11 @@ class AttachmentDetailsDialog(QDialog):
 
 class AddDocumentDialog(QDialog):
     def select_year_folder(self):
-        """عرض مجلدات السنوات الموجودة أو إنشاء مجلد سنة جديدة"""
-        from pathlib import Path
-        import os
-        documents_path = Path('documents')
-        years = [f.name for f in documents_path.iterdir() if f.is_dir() and f.name.isdigit()]
-        from PyQt6.QtWidgets import QInputDialog
-        year, ok = QInputDialog.getItem(self, 'اختر السنة', 'السنة:', years + ['سنة جديدة...'], 0, False)
-        if ok:
-            if year == 'سنة جديدة...':
-                new_year, ok2 = QInputDialog.getText(self, 'سنة جديدة', 'أدخل السنة:')
-                if ok2 and new_year.isdigit():
-                    year_folder = documents_path / new_year
-                    year_folder.mkdir(exist_ok=True)
-                    return str(year_folder)
-                else:
-                    return None
-            else:
-                return str(documents_path / year)
-        return None
+        """استخدم الدالة المساعدة الموحدة لاختيار مجلد السنة."""
+        try:
+            return choose_year_folder(self)
+        except Exception:
+            return None
 
     """نافذة حوار لإضافة وثيقة جديدة"""
     
@@ -409,6 +395,20 @@ class AddDocumentDialog(QDialog):
         self.scanner_status_label = QLabel()
         self._update_scanner_status()
         layout.addRow(self.scanner_status_label)
+
+        # مجلد السنة (اختيار مجلد السنة داخل مجلد التخزين 'documents')
+        from PyQt6.QtWidgets import QWidget
+        year_widget = QWidget()
+        year_widget_layout = QHBoxLayout()
+        self.year_folder_edit = QLineEdit()
+        self.year_folder_edit.setReadOnly(True)
+        self.year_folder_edit.setPlaceholderText('لم يتم اختيار مجلد السنة')
+        year_select_btn = QPushButton('📂 اختيار مجلد السنة')
+        year_select_btn.clicked.connect(self.on_choose_year_folder)
+        year_widget_layout.addWidget(self.year_folder_edit)
+        year_widget_layout.addWidget(year_select_btn)
+        year_widget.setLayout(year_widget_layout)
+        layout.addRow('مجلد السنة:', year_widget)
         
         # أزرار المسح
         scan_layout = QHBoxLayout()
@@ -456,6 +456,16 @@ class AddDocumentDialog(QDialog):
         else:
             self.scanner_status_label.setText(f'✅ حالة السكانر: متصل ({SCANNER_COUNT} جهاز)')
             self.scanner_status_label.setStyleSheet('color: #27ae60; font-size: 11px; padding: 5px; background-color: #eafaf1; border-radius: 3px;')
+
+    def on_choose_year_folder(self):
+        """مستدعى عند الضغط على زر اختيار مجلد السنة"""
+        path = self.select_year_folder()
+        if path:
+            self.selected_year_folder = path
+            try:
+                self.year_folder_edit.setText(path)
+            except Exception:
+                pass
     
     def scan_manual(self):
         """مسح من السكانر مع إدخال يدوي (سريع)"""
@@ -493,11 +503,25 @@ class AddDocumentDialog(QDialog):
             return
         
         try:
-            # اطلب من المستخدم اختيار مجلد السنة قبل المسح
-            year_folder = choose_year_folder(self)
+            # استخدم اختيار مجلد السنة المدمج إن كان موجوداً، وإلا اطلبه عبر الحوار الموحد
+            year_folder = getattr(self, 'selected_year_folder', None)
             if not year_folder:
-                return
+                try:
+                    txt = self.year_folder_edit.text().strip()
+                    if txt and txt != 'لم يتم اختيار مجلد السنة':
+                        year_folder = txt
+                except Exception:
+                    year_folder = None
+
+            if not year_folder:
+                year_folder = self.select_year_folder()
+                if not year_folder:
+                    return
             self.selected_year_folder = year_folder
+            try:
+                self.year_folder_edit.setText(year_folder)
+            except Exception:
+                pass
 
             QMessageBox.information(
                 self, 'جاري المسح',
@@ -549,10 +573,22 @@ class AddDocumentDialog(QDialog):
             '', 'صور (*.jpg *.jpeg *.png *.tiff *.bmp);;جميع الملفات (*)'
         )
         if file_path:
-            year_folder = self.select_year_folder()
+            # استخدم اختيار مجلد السنة المدمج إذا اختاره المستخدم مسبقاً
+            year_folder = getattr(self, 'selected_year_folder', None)
             if not year_folder:
-                QMessageBox.warning(self, 'تنبيه', 'يجب اختيار أو إنشاء مجلد سنة')
-                return
+                try:
+                    txt = self.year_folder_edit.text().strip()
+                    if txt and txt != 'لم يتم اختيار مجلد السنة':
+                        year_folder = txt
+                except Exception:
+                    year_folder = None
+
+            if not year_folder:
+                year_folder = self.select_year_folder()
+                if not year_folder:
+                    QMessageBox.warning(self, 'تنبيه', 'يجب اختيار أو إنشاء مجلد سنة')
+                    return
+
             import os, shutil
             basename = os.path.basename(file_path)
             dest_path = os.path.join(year_folder, basename)
@@ -573,17 +609,58 @@ class AddDocumentDialog(QDialog):
         )
         
         if files:
-            self.scanned_images = files
-            self.scanned_image_path = files[0] if files else None
-            self._update_images_count()
-            
-            if len(files) > 1:
-                self._handle_scanned_documents(len(files))
+            # تأكد من اختيار مجلد السنة (استخدم الحقل المدمج أولاً)
+            year_folder = getattr(self, 'selected_year_folder', None)
+            if not year_folder:
+                try:
+                    txt = self.year_folder_edit.text().strip()
+                    if txt and txt != 'لم يتم اختيار مجلد السنة':
+                        year_folder = txt
+                except Exception:
+                    year_folder = None
+
+            if not year_folder:
+                year_folder = self.select_year_folder()
+                if not year_folder:
+                    QMessageBox.warning(self, 'تنبيه', 'يجب اختيار أو إنشاء مجلد سنة')
+                    return
+            self.selected_year_folder = year_folder
+            try:
+                self.year_folder_edit.setText(year_folder)
+            except Exception:
+                pass
+
+            # انسخ الملفات إلى مجلد السنة حتى تعمل عمليات الحفظ لاحقاً بنفس المسار
+            import shutil, os
+            dest_files = []
+            for f in files:
+                try:
+                    basename = os.path.basename(f)
+                    dest = os.path.join(year_folder, basename)
+                    # تجنب الكتابة فوق ملفات موجودة بإضافة طابع زمني إن لزم
+                    if os.path.exists(dest):
+                        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_%f')
+                        name, ext = os.path.splitext(basename)
+                        dest = os.path.join(year_folder, f"{name}_{timestamp}{ext}")
+                    shutil.copy2(f, dest)
+                    dest_files.append(dest)
+                except Exception as e:
+                    print(f"خطأ في نسخ الملف {f}: {e}")
+
+            if dest_files:
+                self.scanned_images = dest_files
+                self.scanned_image_path = dest_files[0] if dest_files else None
+                self._update_images_count()
+
+                if len(dest_files) > 1:
+                    self._handle_scanned_documents(len(dest_files))
+                else:
+                    QMessageBox.information(
+                        self, 'تم ✅',
+                        'تم اختيار الصورة ونقلها لمجلد السنة بنجاح!\n\nأدخل المعلومات يدوياً في الحقول أدناه'
+                    )
             else:
-                QMessageBox.information(
-                    self, 'تم ✅',
-                    'تم اختيار الصورة بنجاح!\n\nأدخل المعلومات يدوياً في الحقول أدناه'
-                )
+                QMessageBox.warning(self, 'تنبيه', 'لم يتم نسخ أي ملفات')
     
     def scan_multiple(self):
         """مسح تلقائي لجميع الأوراق دفعة واحدة"""
@@ -633,6 +710,27 @@ class AddDocumentDialog(QDialog):
             
             if reply != QMessageBox.StandardButton.Yes:
                 return
+
+            # تأكد من وجود مجلد السنة المختار (الحقل المدمج أولاً)
+            year_folder = getattr(self, 'selected_year_folder', None)
+            if not year_folder:
+                try:
+                    txt = self.year_folder_edit.text().strip()
+                    if txt and txt != 'لم يتم اختيار مجلد السنة':
+                        year_folder = txt
+                except Exception:
+                    year_folder = None
+
+            if not year_folder:
+                year_folder = self.select_year_folder()
+                if not year_folder:
+                    QMessageBox.information(self, 'ملغى', 'تم إلغاء المسح - يجب اختيار مجلد السنة للمتابعة')
+                    return
+            self.selected_year_folder = year_folder
+            try:
+                self.year_folder_edit.setText(year_folder)
+            except Exception:
+                pass
             
             # محاولة استخدام المسح التلقائي أولاً
             try:
@@ -975,10 +1073,25 @@ class AddDocumentDialog(QDialog):
                 return
 
             # اطلب من المستخدم اختيار مجلد السنة قبل المسح
-            year_folder = choose_year_folder(self)
+            # استخدم اختيار مجلد السنة المدمج إن كان موجوداً، وإلا اطلبه عبر الحوار الموحد
+            year_folder = getattr(self, 'selected_year_folder', None)
             if not year_folder:
-                return
+                try:
+                    txt = self.year_folder_edit.text().strip()
+                    if txt and txt != 'لم يتم اختيار مجلد السنة':
+                        year_folder = txt
+                except Exception:
+                    year_folder = None
+
+            if not year_folder:
+                year_folder = self.select_year_folder()
+                if not year_folder:
+                    return
             self.selected_year_folder = year_folder
+            try:
+                self.year_folder_edit.setText(year_folder)
+            except Exception:
+                pass
 
             QMessageBox.information(
                 self, 'جاري المسح',
@@ -1021,28 +1134,58 @@ class AddDocumentDialog(QDialog):
             )
     
     def _process_scanned_image(self, image_path):
-        """معالجة الصورة الممسوحة واستخراج المعلومات وحفظها تلقائياً"""
-        try:
-            from app.ocr_extractor import OCRExtractor
-            
-            QMessageBox.information(
-                self, 'جاري المعالجة',
-                'جاري استخراج المعلومات...\nقد يستغرق 1-2 دقيقة\n\nالرجاء الانتظار...'
-            )
-            
-            extractor = OCRExtractor()
-            info = extractor.extract_document_info(image_path)
-            
-            if info and (info['doc_number'] or info['doc_date']):
-                self._fill_fields(info)
-                self._save_with_image(image_path, info)
-            else:
-                QMessageBox.warning(self, 'تنبيه', 'لم يتم استخراج معلومات. أدخلها يدوياً')
-                self.scanned_image_path = image_path
-        
-        except Exception as e:
-            QMessageBox.critical(self, 'خطأ', f'خطأ في الاستخراج: {str(e)}\n\nأدخل المعلومات يدوياً')
+        """معالجة الصورة الممسوحة واستخراج المعلومات وحفظها تلقائياً في خيط خلفي"""
+        from PyQt6.QtCore import QThread, pyqtSignal, QObject
+
+        class OCRWorker(QThread):
+            finished = pyqtSignal(object)
+            failed = pyqtSignal(str)
+
+            def __init__(self, img_path):
+                super().__init__()
+                self.img_path = img_path
+
+            def run(self):
+                try:
+                    from app.ocr_extractor import OCRExtractor
+                    extractor = OCRExtractor()
+                    info = extractor.extract_document_info(self.img_path)
+                    self.finished.emit(info)
+                except Exception as e:
+                    self.failed.emit(str(e))
+
+        # إظهار مربع تقدم بسيط وقابل للإلغاء
+        progress = QProgressDialog('جاري استخراج المعلومات...', 'إلغاء', 0, 0, self)
+        progress.setWindowTitle('استخراج المضمون')
+        progress.setWindowModality(Qt.WindowModality.WindowModal)
+        progress.setMinimumDuration(0)
+        progress.show()
+
+        worker = OCRWorker(image_path)
+
+        def on_finished(info):
+            progress.close()
+            try:
+                if info and (info.get('doc_number') or info.get('doc_date')):
+                    self._fill_fields(info)
+                    self._save_with_image(image_path, info)
+                else:
+                    QMessageBox.warning(self, 'تنبيه', 'لم يتم استخراج معلومات. أدخلها يدوياً')
+                    self.scanned_image_path = image_path
+            except Exception as e:
+                QMessageBox.critical(self, 'خطأ', f'خطأ في معالجة نتيجة الاستخراج: {str(e)}')
+
+        def on_failed(err):
+            progress.close()
+            QMessageBox.critical(self, 'خطأ', f'خطأ في الاستخراج: {err}\n\nأدخل المعلومات يدوياً')
             self.scanned_image_path = image_path
+
+        worker.finished.connect(on_finished)
+        worker.failed.connect(on_failed)
+
+        # احتفظ بالمرجع لمنع جمع القمامة
+        self._ocr_worker = worker
+        worker.start()
     
     def _fill_fields(self, info):
         """ملء الحقول بالمعلومات المستخرجة"""
@@ -1079,7 +1222,7 @@ class AddDocumentDialog(QDialog):
                 # استخدم مجلد السنة المختار مسبقاً إذا وُجد، وإلا اطلبه الآن
                 year_folder = getattr(self, 'selected_year_folder', None)
                 if not year_folder:
-                    year_folder = choose_year_folder(self)
+                    year_folder = self.select_year_folder()
                 if not year_folder:
                     QMessageBox.warning(self, 'تنبيه', 'يجب اختيار أو إنشاء مجلد سنة لحفظ الصورة')
                     return
