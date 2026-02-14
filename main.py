@@ -13,7 +13,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QSize, pyqtSignal, QTimer
 from PyQt6.QtGui import QIcon, QFont, QColor
 from PyQt6.QtWidgets import QApplication
-
+# test
 # إضافة المسارات
 sys.path.insert(0, str(Path(__file__).parent / 'src'))
 
