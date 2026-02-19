@@ -17,6 +17,7 @@ from PyQt6.QtWidgets import (
 
 from ..constants import ICONS, APP_SETTINGS
 from ..filename_parser import FilenameParser, ImageSequenceHandler
+from ..document_viewer import DocumentViewerWindow  
 from .utils import choose_year_folder
 
 
@@ -346,7 +347,6 @@ class ImportImagesDialog(QDialog):
         
         # استيراد وإنشاء عارض الوثائق
         try:
-            from ..document_viewer import DocumentViewerWindow
             viewer = DocumentViewerWindow(
                 doc_id=0,
                 document_data=temp_doc_data,
