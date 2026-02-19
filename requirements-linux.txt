@@ -1,0 +1,23 @@
+# Document Management System Requirements (Linux)
+# PyQt6 for GUI
+PyQt6>=6.6.0
+
+# Image processing
+Pillow>=10.0.0
+
+# OCR (Optical Character Recognition)
+easyocr>=1.7.0
+pytesseract>=0.3.13
+
+# Supporting libraries (CPU-only PyTorch to reduce size)
+# Install with: pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+# Or use regular torch (3+ GB with CUDA) if GPU is available
+torch>=2.0.0
+numpy>=1.24.0
+
+# Document export
+openpyxl>=3.1.0
+python-docx>=1.2.0
+
+# Note: pywin32 (scanner support) is Windows-only and excluded on Linux
+# The application will work without scanner functionality on Linux

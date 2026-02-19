@@ -1,0 +1,17 @@
+# OCR Add-on Requirements
+# Install AFTER requirements-minimal.txt to add OCR features
+
+# OCR (Optical Character Recognition)
+easyocr>=1.7.0
+pytesseract>=0.3.13
+
+# Supporting libraries for OCR
+torch>=2.0.0
+numpy>=1.24.0
+
+# Installation:
+# 1. First install minimal: pip install -r requirements-minimal.txt
+# 2. Then install OCR: pip install -r requirements-ocr.txt
+# 
+# Or use CPU-only PyTorch to save ~2-3 GB:
+# pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu

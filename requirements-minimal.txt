@@ -1,0 +1,16 @@
+# Document Management System - Minimal Requirements (without OCR)
+# This is a lightweight installation without OCR features
+# Project size: ~2-3 GB instead of 8+ GB
+
+# PyQt6 for GUI
+PyQt6>=6.6.0
+
+# Image processing
+Pillow>=10.0.0
+
+# Document export
+openpyxl>=3.1.0
+python-docx>=1.2.0
+
+# Note: OCR features (easyocr, pytesseract, torch) are excluded
+# To enable OCR, install requirements-linux.txt instead
