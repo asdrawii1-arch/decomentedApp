@@ -15,7 +15,10 @@ from PyQt6.QtGui import QIcon, QFont, QColor
 from PyQt6.QtWidgets import QApplication
 # test
 # إضافة المسارات
-sys.path.insert(0, str(Path(__file__).parent / 'src'))
+import os
+current_dir = os.path.dirname(os.path.abspath(__file__))
+src_path = os.path.join(current_dir, 'src')
+sys.path.insert(0, src_path)
 
 # التحقق من توفر مكتبة السكانر
 SCANNER_AVAILABLE = False
@@ -97,7 +100,7 @@ class MainWindow(QMainWindow):
         search_field_label = QLabel('البحث في:')
         search_layout.addWidget(search_field_label)
         self.search_field = QComboBox()
-        self.search_field.addItems(['اسم الوثيقة', 'التاريخ', 'الجهة', 'التصنيف'])
+        self.search_field.addItems(['اسم الوثيقة', 'المضمون', 'التاريخ', 'الجهة', 'التصنيف'])
         self.search_field.currentTextChanged.connect(self.search_documents)
         search_layout.addWidget(self.search_field)
         
@@ -632,7 +635,24 @@ class MainWindow(QMainWindow):
             progress_text = 'جاري استيراد الصور...'
             if extract_title:
                 progress_text = 'جاري استيراد الصور واستخراج المضمون...'
-            
+                # If the import is very large, ask user whether to run OCR (slow)
+                LARGE_IMPORT_THRESHOLD = 200
+                if total_images > LARGE_IMPORT_THRESHOLD:
+                    reply = QMessageBox.question(
+                        self,
+                        'مجلد كبير',
+                        f'المجلد يحتوي على {total_images} صورة. تشغيل استخراج المضمون عبر Tesseract قد يستغرق وقتاً طويلاً.\n\nهل تريد المتابعة مع استخراج المضمون (أبطأ) أم استيراد بدون OCR (أسرع)?',
+                        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel,
+                    )
+                    if reply == QMessageBox.StandardButton.Cancel:
+                        return
+                    if reply == QMessageBox.StandardButton.No:
+                        extract_title = False
+                        progress_text = 'جاري استيراد الصور (بدون استخراج المضمون)...'
+                    else:
+                        extract_title = True
+                        progress_text = 'جاري استيراد الصور واستخراج المضمون...'
+
             progress = QProgressDialog(progress_text, 'إلغاء', 0, total_images, self)
             progress.setWindowTitle('استيراد الصور')
             progress.setWindowModality(Qt.WindowModality.WindowModal)
@@ -957,6 +977,7 @@ class MainWindow(QMainWindow):
         # تحديد حقل البحث
         field_map = {
             'اسم الوثيقة': 'doc_name',
+            'المضمون': 'doc_title',
             'التاريخ': 'doc_date',
             'الجهة': 'issuing_dept',
             'التصنيف': 'doc_classification'

@@ -120,7 +120,7 @@ class DocumentViewerWindow(QMainWindow):
         
         self.image_label = QLabel()
         self.image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.image_label.setStyleSheet(f"background-color: {COLORS['white']}; border: 2px solid {COLORS['border']};")
+        self.image_label.setStyleSheet(f"background-color: {COLORS.BACKGROUND_WHITE}; border: 2px solid {COLORS.BORDER};")
         
         if not self.image_paths:
             self.image_label.setText("❌ لا توجد صور متاحة")
