@@ -169,7 +169,8 @@ class MainWindow(QMainWindow):
         self.documents_table.setColumnWidth(7, 80)
         self.documents_table.setAlternatingRowColors(True)
         self.documents_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        self.documents_table.setSelectionMode(QTableWidget.SelectionMode.MultiSelection)
+        self.documents_table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
+        self.documents_table.selectionModel().selectionChanged.connect(self.on_row_selection_changed)
         
         # ضع الجدول داخل تخطيط عمودي (للسماح بعناصر إضافية إن لزم)
         right_layout = QVBoxLayout()
@@ -206,6 +207,7 @@ class MainWindow(QMainWindow):
             # Checkbox column
             checkbox = QCheckBox()
             checkbox.setStyleSheet('margin-left: 10px;')
+            checkbox.stateChanged.connect(lambda state, row=row: self.on_checkbox_changed(row, state))
             self.documents_table.setCellWidget(row, 0, checkbox)
             
             # رقم الوثيقة (من اسم الوثيقة)
@@ -1004,6 +1006,7 @@ class MainWindow(QMainWindow):
             # Checkbox column
             checkbox = QCheckBox()
             checkbox.setStyleSheet('margin-left: 10px;')
+            checkbox.stateChanged.connect(lambda state, row=row: self.on_checkbox_changed(row, state))
             self.documents_table.setCellWidget(row, 0, checkbox)
             
             # رقم الوثيقة/المرفق
@@ -1068,6 +1071,41 @@ class MainWindow(QMainWindow):
         
         # Re-enable updates
         self.documents_table.setUpdatesEnabled(True)
+    
+    def on_checkbox_changed(self, row, state):
+        """التحكم في checkboxes - السماح بتحديد واحد فقط"""
+        if state == Qt.CheckState.Checked.value:
+            # إلغاء تحديد جميع checkboxes الأخرى
+            for other_row in range(self.documents_table.rowCount()):
+                if other_row != row:
+                    other_checkbox = self.documents_table.cellWidget(other_row, 0)
+                    if other_checkbox:
+                        other_checkbox.blockSignals(True)  # منع إرسال signals
+                        other_checkbox.setChecked(False)
+                        other_checkbox.blockSignals(False)
+            
+            # تحديد الصف في الجدول أيضاً
+            self.documents_table.selectRow(row)
+    
+    def on_row_selection_changed(self, selected, deselected):
+        """عند تحديد صف جديد، تحديث checkbox المطابق"""
+        # إلغاء جميع checkboxes أولاً
+        for row in range(self.documents_table.rowCount()):
+            checkbox = self.documents_table.cellWidget(row, 0)
+            if checkbox:
+                checkbox.blockSignals(True)
+                checkbox.setChecked(False)
+                checkbox.blockSignals(False)
+        
+        # تحديد checkbox للصف المختار
+        selected_rows = self.documents_table.selectionModel().selectedRows()
+        if selected_rows:
+            row = selected_rows[0].row()
+            checkbox = self.documents_table.cellWidget(row, 0)
+            if checkbox:
+                checkbox.blockSignals(True)
+                checkbox.setChecked(True)
+                checkbox.blockSignals(False)
 
 
 def main():
