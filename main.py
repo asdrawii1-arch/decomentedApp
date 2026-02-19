@@ -135,6 +135,10 @@ class MainWindow(QMainWindow):
         select_all_btn.clicked.connect(self.select_all_documents)
         toolbar_layout.addWidget(select_all_btn)
         
+        deselect_all_btn = QPushButton('✗ إلغاء التحديد')
+        deselect_all_btn.clicked.connect(self.deselect_all_documents)
+        toolbar_layout.addWidget(deselect_all_btn)
+        
         delete_selected_btn = QPushButton('🗑️ حذف المحددة')
         delete_selected_btn.clicked.connect(self.delete_selected_documents)
         toolbar_layout.addWidget(delete_selected_btn)
@@ -169,7 +173,7 @@ class MainWindow(QMainWindow):
         self.documents_table.setColumnWidth(7, 80)
         self.documents_table.setAlternatingRowColors(True)
         self.documents_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        self.documents_table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
+        self.documents_table.setSelectionMode(QTableWidget.SelectionMode.ExtendedSelection)
         self.documents_table.selectionModel().selectionChanged.connect(self.on_row_selection_changed)
         
         # ضع الجدول داخل تخطيط عمودي (للسماح بعناصر إضافية إن لزم)
@@ -904,10 +908,29 @@ class MainWindow(QMainWindow):
     
     def select_all_documents(self):
         """تحديد جميع الوثائق"""
+        # تحديد جميع الصفوف في الجدول
+        self.documents_table.selectAll()
+        
+        # تحديد جميع checkboxes
         for row in range(self.documents_table.rowCount()):
             checkbox = self.documents_table.cellWidget(row, 0)
             if checkbox:
+                checkbox.blockSignals(True)  # منع إرسال signals تجنباً للتداخل
                 checkbox.setChecked(True)
+                checkbox.blockSignals(False)
+    
+    def deselect_all_documents(self):
+        """إلغاء تحديد جميع الوثائق"""
+        # إلغاء تحديد جميع الصفوف في الجدول
+        self.documents_table.clearSelection()
+        
+        # إلغاء تحديد جميع checkboxes
+        for row in range(self.documents_table.rowCount()):
+            checkbox = self.documents_table.cellWidget(row, 0)
+            if checkbox:
+                checkbox.blockSignals(True)  # منع إرسال signals تجنباً للتداخل
+                checkbox.setChecked(False)
+                checkbox.blockSignals(False)
     
     def delete_selected_documents(self):
         """حذف جميع الوثائق المحددة"""
@@ -1073,23 +1096,23 @@ class MainWindow(QMainWindow):
         self.documents_table.setUpdatesEnabled(True)
     
     def on_checkbox_changed(self, row, state):
-        """التحكم في checkboxes - السماح بتحديد واحد فقط"""
+        """التحكم في checkboxes - دعم التحديد المتعدد"""
+        # تحديث تحديد الصف في الجدول وفقاً لحالة checkbox
         if state == Qt.CheckState.Checked.value:
-            # إلغاء تحديد جميع checkboxes الأخرى
-            for other_row in range(self.documents_table.rowCount()):
-                if other_row != row:
-                    other_checkbox = self.documents_table.cellWidget(other_row, 0)
-                    if other_checkbox:
-                        other_checkbox.blockSignals(True)  # منع إرسال signals
-                        other_checkbox.setChecked(False)
-                        other_checkbox.blockSignals(False)
-            
-            # تحديد الصف في الجدول أيضاً
+            # إضافة الصف للتحديد
             self.documents_table.selectRow(row)
+        else:
+            # إزالة تحديد الصف المحدد
+            selection_model = self.documents_table.selectionModel()
+            index = self.documents_table.model().index(row, 0)
+            selection_model.select(index, selection_model.SelectionFlag.Deselect | selection_model.SelectionFlag.Rows)
     
     def on_row_selection_changed(self, selected, deselected):
         """عند تحديد صف جديد، تحديث checkbox المطابق"""
-        # إلغاء جميع checkboxes أولاً
+        # تحديث checkboxes للصفوف المحددة
+        selected_rows = self.documents_table.selectionModel().selectedRows()
+        
+        # أولاً، امسح جميع checkboxes
         for row in range(self.documents_table.rowCount()):
             checkbox = self.documents_table.cellWidget(row, 0)
             if checkbox:
@@ -1097,10 +1120,9 @@ class MainWindow(QMainWindow):
                 checkbox.setChecked(False)
                 checkbox.blockSignals(False)
         
-        # تحديد checkbox للصف المختار
-        selected_rows = self.documents_table.selectionModel().selectedRows()
-        if selected_rows:
-            row = selected_rows[0].row()
+        # ثم، حدد checkboxes للصفوف المختارة
+        for index in selected_rows:
+            row = index.row()
             checkbox = self.documents_table.cellWidget(row, 0)
             if checkbox:
                 checkbox.blockSignals(True)

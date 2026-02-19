@@ -93,6 +93,12 @@ class ImportImagesDialog(QDialog):
         delete_btn.setMaximumWidth(100)
         file_label_layout.addWidget(delete_btn)
         
+        # زر عرض الوثيقة
+        view_btn = QPushButton(f'{ICONS.VIEW} عرض')
+        view_btn.clicked.connect(self.view_selected_document)
+        view_btn.setMaximumWidth(100)
+        file_label_layout.addWidget(view_btn)
+        
         parent_layout.addLayout(file_label_layout)
         
         # قائمة الملفات
@@ -285,3 +291,68 @@ class ImportImagesDialog(QDialog):
             list: قائمة مسارات الملفات المختارة
         """
         return self.selected_files
+    
+    def view_selected_document(self):
+        """
+        عرض الوثيقة المحددة في عارض الوثائق
+        """
+        selected_items = self.file_list.selectedItems()
+        
+        if not selected_items:
+            QMessageBox.warning(self, 'تنبيه', 'يجب تحديد ملف لعرضه أولاً')
+            return
+        
+        if len(selected_items) > 1:
+            QMessageBox.warning(self, 'تنبيه', 'يرجى تحديد ملف واحد فقط للعرض')
+            return
+        
+        # الحصول على الملف المحدد
+        selected_filename = selected_items[0].text()
+        selected_filepath = None
+        
+        for file_path in self.selected_files:
+            if os.path.basename(file_path) == selected_filename:
+                selected_filepath = file_path
+                break
+        
+        if not selected_filepath:
+            QMessageBox.warning(self, 'خطأ', 'لم يتم العثور على مسار الملف')
+            return
+        
+        # تحليل اسم الملف لاستخراج معلومات الوثيقة
+        parsed = FilenameParser.parse_filename(selected_filename)
+        
+        if not parsed['is_valid']:
+            QMessageBox.warning(self, 'خطأ', f'لا يمكن تحليل اسم الملف: {selected_filename}')
+            return
+        
+        # إنشاء بيانات وثيقة مؤقتة للعرض
+        temp_doc_data = (
+            0,  # doc_id (مؤقت)
+            f"{parsed['number']} في {parsed['date']}",  # doc_name  
+            parsed['date'],  # doc_date
+            '',  # doc_title (فارغ)
+            parsed['department'],  # issuing_dept
+            '',  # doc_classification (فارغ)
+            ''   # legal_paragraph (فارغ)
+        )
+        
+        # إنشاء بيانات الصور
+        images_data = [{
+            'path': selected_filepath,
+            'page_number': parsed.get('sequence', 1),
+            'notes': f'صفحة {parsed.get("sequence", 1)}' if parsed.get('sequence') else 'صفحة واحدة'
+        }]
+        
+        # استيراد وإنشاء عارض الوثائق
+        try:
+            from ..document_viewer import DocumentViewerWindow
+            viewer = DocumentViewerWindow(
+                doc_id=0,
+                document_data=temp_doc_data,
+                images_data=images_data,
+                parent=self
+            )
+            viewer.show()
+        except Exception as e:
+            QMessageBox.critical(self, 'خطأ', f'خطأ في فتح عارض الوثائق:\n{str(e)}')
