@@ -67,11 +67,12 @@ class DocumentViewerWindow(QMainWindow):
         # معلومات الصورة/المرفق الحالي (شريط واحد فقط)
         self.current_image_info = QLabel()
         self.current_image_info.setStyleSheet(
-            "background-color: #2c3e50; color: white; padding: 12px; "
-            "font-size: 13px; border-radius: 5px; margin: 5px;"
+            "background-color: #2c3e50; color: white; padding: 8px; "
+            "font-size: 12px; border-radius: 8px; margin: 3px;"
+            "border: 1px solid #34495e;"
         )
         self.current_image_info.setWordWrap(True)
-        self.current_image_info.setMinimumHeight(150)  # زيادة الارتفاع لاستيعاب معلومات الوثيقة
+        self.current_image_info.setMinimumHeight(100)  # تصغير الارتفاع ليكون أكثر أناقة
         main_layout.addWidget(self.current_image_info)
         
         # منطقة عرض الصور مع قائمة الصور
@@ -222,7 +223,7 @@ class DocumentViewerWindow(QMainWindow):
         """تحديث معلومات الصورة/المرفق الحالي مع عرض معلومات الوثيقة"""
         total_pages = len(self.image_paths)
         
-        # إنشاء معلومات الوثيقة الأساسية 
+        # إنشاء معلومات الوثيقة الأساسية بتصميم محسن ومضغوط
         doc_info_html = ""
         if self.document_data and len(self.document_data) >= 5:
             doc_name = self.document_data[1] if len(self.document_data) > 1 else "غير محدد"
@@ -231,12 +232,12 @@ class DocumentViewerWindow(QMainWindow):
             issuing_dept = self.document_data[4] if len(self.document_data) > 4 else "غير محدد"
             
             doc_info_html = f"""
-            <div style='background-color: #34495e; padding: 8px; border-radius: 5px; margin-bottom: 8px;'>
-                <span style='color: #ecf0f1; font-size: 14px; font-weight: bold;'>📋 معلومات الوثيقة:</span><br>
-                <span style='color: #3498db;'>🔢 رقم الوثيقة:</span> <span style='color: #ecf0f1;'>{doc_name}</span><br>
-                <span style='color: #e74c3c;'>📅 التاريخ:</span> <span style='color: #ecf0f1;'>{doc_date}</span><br>
-                <span style='color: #f39c12;'>📝 المضمون:</span> <span style='color: #ecf0f1;'>{doc_title}</span><br>
-                <span style='color: #2ecc71;'>🏢 جهة الإصدار:</span> <span style='color: #ecf0f1;'>{issuing_dept}</span>
+            <div style='background: linear-gradient(135deg, #3498db, #2980b9); padding: 6px; border-radius: 6px; margin-bottom: 6px;'>
+                <span style='color: #fff; font-size: 13px; font-weight: bold;'>📋 معلومات الوثيقة</span><br>
+                <span style='color: #ecf0f1; font-size: 11px;'>
+                🔢 <b>{doc_name}</b> • 📅 {doc_date}<br>
+                📝 {doc_title} • 🏢 {issuing_dept}
+                </span>
             </div>
             """
         
@@ -253,37 +254,37 @@ class DocumentViewerWindow(QMainWindow):
                 type_icon = "📎"
                 type_text = f"المرفق {index}"
             
-            # بناء النص بتنسيق أنيق
-            header = f"<span style='font-size: 15px;'>{type_icon} <b>{type_text}</b></span>"
-            page_info = f"<span style='color: #bdc3c7;'>الصفحة {index + 1} من {total_pages}</span>"
+            # بناء النص بتنسيق أنيق ومضغوط
+            header = f"<span style='font-size: 13px; color: #3498db;'>{type_icon} <b>{type_text}</b></span>"
+            page_info = f"<span style='color: #bdc3c7; font-size: 11px;'>الصفحة {index + 1} من {total_pages}</span>"
             
             if notes:
-                # تحويل الملاحظات لتنسيق أفضل مع أيقونات
+                # تحويل الملاحظات لتنسيق أفضل مع أيقونات مضغوطة
                 notes_parts = notes.split(' | ')
                 notes_html = ""
                 for part in notes_parts:
                     if part.startswith('رقم:'):
-                        notes_html += f"<br>🔢 {part}"
+                        notes_html += f"<br><span style='font-size: 11px; color: #e74c3c;'>🔢 {part}</span>"
                     elif part.startswith('تاريخ:'):
-                        notes_html += f"<br>📅 {part}"
+                        notes_html += f"<br><span style='font-size: 11px; color: #e67e22;'>📅 {part}</span>"
                     elif part.startswith('مضمون:'):
-                        notes_html += f"<br>📝 {part}"
+                        notes_html += f"<br><span style='font-size: 11px; color: #f39c12;'>📝 {part}</span>"
                     elif part.startswith('جهة:'):
-                        notes_html += f"<br>🏢 {part}"
+                        notes_html += f"<br><span style='font-size: 11px; color: #27ae60;'>🏢 {part}</span>"
                     elif part.startswith('تصنيف:'):
-                        notes_html += f"<br>🏷️ {part}"
+                        notes_html += f"<br><span style='font-size: 11px; color: #8e44ad;'>🏷️ {part}</span>"
                     elif part.startswith('ملاحظات:'):
-                        notes_html += f"<br>💬 {part}"
+                        notes_html += f"<br><span style='font-size: 11px; color: #16a085;'>💬 {part}</span>"
                     else:
-                        notes_html += f"<br>• {part}"
+                        notes_html += f"<br><span style='font-size: 11px; color: #95a5a6;'>• {part}</span>"
                 
                 info_text = f"{doc_info_html}{header} &nbsp;&nbsp; {page_info}{notes_html}"
             else:
-                info_text = f"{doc_info_html}{header} &nbsp;&nbsp; {page_info}<br><br><span style='color: #95a5a6;'>لا توجد معلومات إضافية</span>"
+                info_text = f"{doc_info_html}{header} &nbsp;&nbsp; {page_info}"
             
             self.current_image_info.setText(info_text)
         else:
-            self.current_image_info.setText(f"{doc_info_html}<b>📄 الصورة {index + 1} من {total_pages}</b>")
+            self.current_image_info.setText(f"{doc_info_html}<b style='color: #3498db;'>📄 الصورة {index + 1} من {total_pages}</b>")
     
     def prev_page(self):
         """الصفحة السابقة"""
