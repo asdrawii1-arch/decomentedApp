@@ -164,29 +164,52 @@ class DatabaseManager:
         return results
     
     def search_documents_and_attachments(self, search_term, search_field='doc_name'):
-        """البحث عن الوثائق والمرفقات حسب الحقل المختار"""
+        """البحث عن الوثائق والمرفقات حسب الحقل المختار بدقة"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
         # تحويل النتائج لقاموس للتحقق من التكرار
         results_dict = {}
         
-        # البحث في الوثائق الرئيسية
+        # البحث في الوثائق الرئيسية حسب الحقل المحدد
         if search_field == 'doc_name':
-            # البحث في اسم الوثيقة مع الترتيب حسب الرقم
+            # البحث الدقيق في رقم الوثيقة - أولاً المطابق تماماً، ثم المبتدئ بنفس الرقم
             cursor.execute('''
-                SELECT * FROM documents 
-                WHERE doc_name LIKE ? 
-                ORDER BY CAST(SUBSTR(doc_name, 1, INSTR(doc_name || ' ', ' ') - 1) AS INTEGER)
-            ''', (f'%{search_term}%',))
+                SELECT *, 
+                       CASE 
+                           WHEN SUBSTR(doc_name, 1, INSTR(doc_name || ' ', ' ') - 1) = ? THEN 1
+                           WHEN SUBSTR(doc_name, 1, INSTR(doc_name || ' ', ' ') - 1) LIKE ? THEN 2
+                           ELSE 3
+                       END as priority
+                FROM documents 
+                WHERE SUBSTR(doc_name, 1, INSTR(doc_name || ' ', ' ') - 1) = ? 
+                   OR SUBSTR(doc_name, 1, INSTR(doc_name || ' ', ' ') - 1) LIKE ?
+                ORDER BY priority, CAST(SUBSTR(doc_name, 1, INSTR(doc_name || ' ', ' ') - 1) AS INTEGER)
+            ''', (search_term, f'{search_term}%', search_term, f'{search_term}%',))
+        elif search_field == 'doc_date':
+            # البحث في التاريخ فقط
+            cursor.execute('SELECT * FROM documents WHERE doc_date LIKE ? ORDER BY doc_date', (f'%{search_term}%',))
+        elif search_field == 'doc_title':
+            # البحث في المضمون فقط
+            cursor.execute('SELECT * FROM documents WHERE doc_title LIKE ? ORDER BY doc_title', (f'%{search_term}%',))
+        elif search_field == 'issuing_dept':
+            # البحث في الجهة فقط
+            cursor.execute('SELECT * FROM documents WHERE issuing_dept LIKE ? ORDER BY issuing_dept', (f'%{search_term}%',))
+        elif search_field == 'doc_classification':
+            # البحث في التصنيف فقط
+            cursor.execute('SELECT * FROM documents WHERE doc_classification LIKE ? ORDER BY doc_classification', (f'%{search_term}%',))
         else:
-            # البحث في الحقول الأخرى
-            query = f'SELECT * FROM documents WHERE {search_field} LIKE ? ORDER BY {search_field}'
-            cursor.execute(query, (f'%{search_term}%',))
+            # حماية من SQL injection - استخدام الحقل الافتراضي
+            cursor.execute('SELECT * FROM documents WHERE doc_name LIKE ? ORDER BY doc_name', (f'%{search_term}%',))
         
         doc_results = cursor.fetchall()
         
+        # إضافة نتائج البحث الرئيسية
         for doc in doc_results:
+            # استبعاد عمود priority إذا كان موجوداً (في حالة البحث بـ doc_name)
+            if search_field == 'doc_name' and len(doc) > 7:
+                doc = doc[:-1]  # إزالة العمود الأخير (priority)
+            
             doc_id = doc[0]
             doc_name = doc[1] or ''
             # استخراج رقم الوثيقة من الاسم
@@ -198,91 +221,87 @@ class DatabaseManager:
                 'attachment_info': None
             }
         
-        # البحث في المرفقات فقط إذا كان البحث في اسم الوثيقة أو المضمون
-        if search_field in ['doc_name', 'doc_title']:
-            # بناء شرط البحث في الملاحظات حسب نوع الحقل
-            if search_field == 'doc_name':
-                # البحث عن رقم الوثيقة في ملاحظات المرفقات
-                cursor.execute('''
-                    SELECT DISTINCT i.document_id, i.notes, d.*
-                    FROM images i
-                    JOIN documents d ON i.document_id = d.id
-                    WHERE i.notes LIKE ?
-                    ORDER BY CAST(SUBSTR(d.doc_name, 1, INSTR(d.doc_name || ' ', ' ') - 1) AS INTEGER)
-                ''', (f'%رقم: %{search_term}%',))
-            elif search_field == 'doc_title':
-                # البحث عن المضمون في ملاحظات المرفقات
-                cursor.execute('''
-                    SELECT DISTINCT i.document_id, i.notes, d.*
-                    FROM images i
-                    JOIN documents d ON i.document_id = d.id
-                    WHERE i.notes LIKE ?
-                    ORDER BY d.doc_title
-                ''', (f'%مضمون: %{search_term}%',))
+        # البحث في المرفقات والصور الإضافية
+        if search_field == 'doc_name':
+            # البحث في ملاحظات الصور للعثور على وثائق تحتوي على نفس الرقم في المرفقات
+            cursor.execute('''
+                SELECT DISTINCT i.document_id, i.notes, d.*
+                FROM images i
+                JOIN documents d ON i.document_id = d.id
+                WHERE i.notes IS NOT NULL 
+                ORDER BY CAST(SUBSTR(d.doc_name, 1, INSTR(d.doc_name || ' ', ' ') - 1) AS INTEGER)
+            ''')
             
             attachment_results = cursor.fetchall()
             
             for row in attachment_results:
                 doc_id = row[0]
-                attachment_notes = row[1]
+                attachment_notes = row[1] or ''
                 doc_data = row[2:]  # بيانات الوثيقة تبدأ من العمود 2
                 
-                # استخراج المعلومات من الملاحظات حسب نوع البحث
-                if search_field == 'doc_name':
-                    # استخراج رقم المرفق من الملاحظات
-                    attachment_number = None
-                    if attachment_notes:
-                        import re
-                        match = re.search(r'رقم:\s*([^\|]+)', attachment_notes)
-                        if match:
-                            attachment_number = match.group(1).strip()
-                            # تحقق إذا كان رقم المرفق يحتوي على مصطلح البحث
-                            if search_term.lower() in attachment_number.lower():
-                                # إذا كانت الوثيقة موجودة بالفعل في النتائج
-                                if doc_id in results_dict:
-                                    # تحقق إذا كان رقم المرفق مختلف عن رقم الوثيقة الرئيسية
-                                    main_doc_number = results_dict[doc_id]['doc_number']
-                                    if attachment_number and attachment_number != main_doc_number:
-                                        # أضف كنتيجة منفصلة (مرفق)
-                                        new_key = f"{doc_id}_att_{attachment_number}"
-                                        if new_key not in results_dict:
-                                            results_dict[new_key] = {
-                                                'doc': doc_data,
-                                                'doc_number': attachment_number,
-                                                'source': 'attachment',
-                                                'attachment_info': attachment_notes
-                                            }
-                                else:
-                                    # الوثيقة غير موجودة، أضفها
-                                    results_dict[doc_id] = {
+                # البحث في ملاحظات المرفق عن رقم الوثيقة
+                if attachment_notes:
+                    import re
+                    # البحث عن "رقم: X" في الملاحظات
+                    number_match = re.search(r'رقم:\s*([^\|]+)', attachment_notes)
+                    if number_match:
+                        attachment_number = number_match.group(1).strip()
+                        # تحقق إذا كان رقم المرفق يطابق البحث تماماً أو يبدأ بنفس الرقم
+                        if (attachment_number == search_term or 
+                            attachment_number.startswith(search_term)):
+                            
+                            # إذا كانت الوثيقة موجودة بالفعل في النتائج
+                            if doc_id in results_dict:
+                                main_doc_number = results_dict[doc_id]['doc_number']
+                                # إذا كان رقم المرفق مختلف عن رقم الوثيقة الرئيسية
+                                if attachment_number != main_doc_number:
+                                    # أضف كنتيجة منفصلة (مرفق)
+                                    new_key = f"{doc_id}_att_{len(results_dict)}"
+                                    results_dict[new_key] = {
                                         'doc': doc_data,
-                                        'doc_number': attachment_number or '',
+                                        'doc_number': attachment_number,
                                         'source': 'attachment',
                                         'attachment_info': attachment_notes
                                     }
+                            else:
+                                # الوثيقة غير موجودة في النتائج الرئيسية، أضفها
+                                results_dict[f"{doc_id}_att"] = {
+                                    'doc': doc_data,
+                                    'doc_number': attachment_number,
+                                    'source': 'attachment',
+                                    'attachment_info': attachment_notes
+                                }
+        
+        elif search_field == 'doc_title':
+            # البحث في مضمون المرفقات
+            cursor.execute('''
+                SELECT DISTINCT i.document_id, i.notes, d.*
+                FROM images i
+                JOIN documents d ON i.document_id = d.id
+                WHERE i.notes LIKE ?
+                ORDER BY d.doc_title
+            ''', (f'%مضمون:%{search_term}%',))
+            
+            attachment_results = cursor.fetchall()
+            
+            for row in attachment_results:
+                doc_id = row[0]
+                attachment_notes = row[1] or ''
+                doc_data = row[2:]
                 
-                elif search_field == 'doc_title':
-                    # البحث في مضمون المرفقات
-                    if attachment_notes:
+                if attachment_notes and search_term.lower() in attachment_notes.lower():
+                    # إذا كانت الوثيقة غير موجودة في النتائج، أضفها
+                    if doc_id not in results_dict:
                         import re
-                        title_match = re.search(r'مضمون:\s*([^\|]+)', attachment_notes)
-                        if title_match:
-                            attachment_title = title_match.group(1).strip()
-                            # تحقق إذا كان مضمون المرفق يحتوي على مصطلح البحث
-                            if search_term.lower() in attachment_title.lower():
-                                attachment_number = None
-                                number_match = re.search(r'رقم:\s*([^\|]+)', attachment_notes)
-                                if number_match:
-                                    attachment_number = number_match.group(1).strip()
-                                
-                                # إذا كانت الوثيقة غير موجودة في النتائج، أضفها
-                                if doc_id not in results_dict:
-                                    results_dict[doc_id] = {
-                                        'doc': doc_data,
-                                        'doc_number': attachment_number or '',
-                                        'source': 'attachment',
-                                        'attachment_info': attachment_notes
-                                    }
+                        number_match = re.search(r'رقم:\s*([^\|]+)', attachment_notes)
+                        attachment_number = number_match.group(1).strip() if number_match else ''
+                        
+                        results_dict[f"{doc_id}_att"] = {
+                            'doc': doc_data,
+                            'doc_number': attachment_number,
+                            'source': 'attachment',
+                            'attachment_info': attachment_notes
+                        }
         
         conn.close()
         
