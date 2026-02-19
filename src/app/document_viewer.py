@@ -71,7 +71,7 @@ class DocumentViewerWindow(QMainWindow):
             "font-size: 13px; border-radius: 5px; margin: 5px;"
         )
         self.current_image_info.setWordWrap(True)
-        self.current_image_info.setMinimumHeight(80)
+        self.current_image_info.setMinimumHeight(150)  # زيادة الارتفاع لاستيعاب معلومات الوثيقة
         main_layout.addWidget(self.current_image_info)
         
         # منطقة عرض الصور مع قائمة الصور
@@ -219,8 +219,26 @@ class DocumentViewerWindow(QMainWindow):
             print(f"  ✅ تم تحميل الصورة بنجاح (الحجم بعد التحجيم: {scaled_pixmap.width()}x{scaled_pixmap.height()})")
     
     def _update_current_image_info(self, index):
-        """تحديث معلومات الصورة/المرفق الحالي"""
+        """تحديث معلومات الصورة/المرفق الحالي مع عرض معلومات الوثيقة"""
         total_pages = len(self.image_paths)
+        
+        # إنشاء معلومات الوثيقة الأساسية 
+        doc_info_html = ""
+        if self.document_data and len(self.document_data) >= 5:
+            doc_name = self.document_data[1] if len(self.document_data) > 1 else "غير محدد"
+            doc_date = self.document_data[2] if len(self.document_data) > 2 else "غير محدد"  
+            doc_title = self.document_data[3] if len(self.document_data) > 3 else "غير محدد"
+            issuing_dept = self.document_data[4] if len(self.document_data) > 4 else "غير محدد"
+            
+            doc_info_html = f"""
+            <div style='background-color: #34495e; padding: 8px; border-radius: 5px; margin-bottom: 8px;'>
+                <span style='color: #ecf0f1; font-size: 14px; font-weight: bold;'>📋 معلومات الوثيقة:</span><br>
+                <span style='color: #3498db;'>🔢 رقم الوثيقة:</span> <span style='color: #ecf0f1;'>{doc_name}</span><br>
+                <span style='color: #e74c3c;'>📅 التاريخ:</span> <span style='color: #ecf0f1;'>{doc_date}</span><br>
+                <span style='color: #f39c12;'>📝 المضمون:</span> <span style='color: #ecf0f1;'>{doc_title}</span><br>
+                <span style='color: #2ecc71;'>🏢 جهة الإصدار:</span> <span style='color: #ecf0f1;'>{issuing_dept}</span>
+            </div>
+            """
         
         if index < len(self.images_data):
             img_data = self.images_data[index]
@@ -259,13 +277,13 @@ class DocumentViewerWindow(QMainWindow):
                     else:
                         notes_html += f"<br>• {part}"
                 
-                info_text = f"{header} &nbsp;&nbsp; {page_info}{notes_html}"
+                info_text = f"{doc_info_html}{header} &nbsp;&nbsp; {page_info}{notes_html}"
             else:
-                info_text = f"{header} &nbsp;&nbsp; {page_info}<br><br><span style='color: #95a5a6;'>لا توجد معلومات إضافية</span>"
+                info_text = f"{doc_info_html}{header} &nbsp;&nbsp; {page_info}<br><br><span style='color: #95a5a6;'>لا توجد معلومات إضافية</span>"
             
             self.current_image_info.setText(info_text)
         else:
-            self.current_image_info.setText(f"<b>📄 الصورة {index + 1} من {total_pages}</b>")
+            self.current_image_info.setText(f"{doc_info_html}<b>📄 الصورة {index + 1} من {total_pages}</b>")
     
     def prev_page(self):
         """الصفحة السابقة"""
