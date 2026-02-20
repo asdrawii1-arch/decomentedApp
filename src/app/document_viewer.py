@@ -60,6 +60,13 @@ class DocumentViewerWindow(QMainWindow):
         
         # تحميل الصور مسبقاً لتحسين الأداء
         self.preload_images()
+
+        # افتح نافذة العارض مكبرة لتملأ الشاشة
+        try:
+            self.showMaximized()
+        except Exception:
+            # في حالة عدم دعم البيئة، تجاهل الخطأ
+            pass
         
         # عرض الصورة الأولى
         if self.image_paths:
@@ -181,8 +188,8 @@ class DocumentViewerWindow(QMainWindow):
         self.current_image_info.setStyleSheet(
             "QLabel { "
             "background-color: white; color: #000000; padding: 12px; "
-            "font-size: 11px; border: 1px solid #bdc3c7; border-radius: 8px; "
-            "line-height: 1.4; font-weight: bold; }"
+            "font-size: 12px; border: 1px solid #bdc3c7; border-radius: 8px; "
+            "line-height: 1.4; font-weight: 800; font-family: 'Segoe UI', Arial, sans-serif; }"
         )
         self.current_image_info.setWordWrap(True)
         self.current_image_info.setMinimumHeight(120)
@@ -342,16 +349,7 @@ class DocumentViewerWindow(QMainWindow):
         center_layout.setSpacing(3)
         center_layout.setContentsMargins(8, 8, 8, 8)
         
-        # عنوان منطقة العرض
-        viewer_title = QLabel('📸 عرض الوثيقة')
-        viewer_title.setStyleSheet(
-            "font-size: 16px; font-weight: bold; padding: 8px; "
-            "background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #3498db, stop:1 #2980b9); "
-            "color: white; border-radius: 6px; text-align: center;"
-        )
-        viewer_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        viewer_title.setMaximumHeight(40)
-        center_layout.addWidget(viewer_title)
+        # (عنوان منطقة العرض تمت إزالته للاستفادة من المساحة الرأسية)
         
         # منطقة عرض الصورة مع تحسين المساحة الطولية
         self.image_label = QLabel()
@@ -686,8 +684,8 @@ class DocumentViewerWindow(QMainWindow):
             
             doc_info_html = f"""
             <div style='background: linear-gradient(135deg, #3498db, #2980b9); padding: 6px; border-radius: 6px; margin-bottom: 6px;'>
-                <span style='color: #fff; font-size: 13px; font-weight: bold;'>📋 معلومات الوثيقة</span><br>
-                <span style='color: #ecf0f1; font-size: 11px;'>
+                <span style='color: #fff; font-size: 12px; font-weight: bold;'>📋 معلومات الوثيقة</span><br>
+                <span style='color: #000000; font-size: 12px; font-weight: 700;'>
                 🔢 <b>{doc_name}</b> • 📅 {doc_date}<br>
                 📝 {doc_title} • 🏢 {issuing_dept}
                 </span>

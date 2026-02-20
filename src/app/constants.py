@@ -22,52 +22,52 @@ from typing import Dict
 class Colors:
     """ثوابت الألوان المستخدمة في التطبيق"""
     
-    # ألوان أساسية - Primary Colors
-    PRIMARY = "#696969"           # رمادي داكن - اللون الأساسي
-    PRIMARY_DARK = "#505050"      # رمادي أغمق
-    PRIMARY_LIGHT = "#808080"     # رمادي فاتح
+    # Primary Colors - Modern light theme palette
+    PRIMARY = "#ffffff"           # white primary surface
+    PRIMARY_DARK = "#f8fafc"      # very light gray for subtle surfaces
+    PRIMARY_LIGHT = "#ffffff"     # same as primary for surfaces
+
+    # Secondary tones for panels and surfaces
+    SECONDARY = "#f3f6f9"
+    SECONDARY_DARK = "#eef2f6"
+    SECONDARY_LIGHT = "#fbfdff"
+
+    # Backgrounds
+    BACKGROUND = "#f8fafc"        # app main background (very light)
+    BACKGROUND_DARK = "#eef2f6"   # toolbar / elevated surface
+    BACKGROUND_LIGHT = "#ffffff"  # panel background (white)
+    BACKGROUND_WHITE = "#ffffff"  # explicit white surface
+
+    # Text
+    TEXT_PRIMARY = "#0f1724"      # dark primary text (rich charcoal)
+    TEXT_SECONDARY = "#475569"    # secondary text (muted slate)
+    TEXT_MUTED = "#6b7280"        # muted text (gray)
+    TEXT_WHITE = "#ffffff"        # white
+
+    # Borders
+    BORDER = "#e6eef6"           # subtle border
+    BORDER_LIGHT = "#ecf0f4"
+    BORDER_DARK = "#d6e3ef"
     
-    # ألوان ثانوية - Secondary Colors  
-    SECONDARY = "#a9a9a9"         # رمادي متوسط
-    SECONDARY_DARK = "#808080"    # رمادي غامق
-    SECONDARY_LIGHT = "#c0c0c0"   # رمادي فاتح جداً
-    
-    # ألوان الخلفية - Background Colors
-    BACKGROUND = "#e8e8e8"        # خلفية رئيسية
-    BACKGROUND_DARK = "#ee3"   # خلفية داكنة  check usage and correct
-    BACKGROUND_LIGHT = "#f5f5f5"  # خلفية فاتحة
-    BACKGROUND_WHITE = "#ffffff"  # أبيض
-    
-    # ألوان النص - Text Colors
-    TEXT_PRIMARY = "#333333"      # نص أساسي
-    TEXT_SECONDARY = "#666666"    # نص ثانوي
-    TEXT_MUTED = "#999999"        # نص خافت
-    TEXT_WHITE = "#ffffff"        # نص أبيض
-    
-    # ألوان الحدود - Border Colors
-    BORDER = "#999999"            # حدود عادية
-    BORDER_LIGHT = "#d3d3d3"      # حدود فاتحة
-    BORDER_DARK = "#696969"       # حدود داكنة
-    
-    # ألوان الحالة - Status Colors
-    SUCCESS = "#27ae60"           # نجاح (أخضر)
-    SUCCESS_LIGHT = "#eafaf1"     # خلفية نجاح
-    WARNING = "#e67e22"           # تحذير (برتقالي)
-    WARNING_LIGHT = "#fef9e7"     # خلفية تحذير
-    ERROR = "#e74c3c"             # خطأ (أحمر)
-    ERROR_LIGHT = "#fdf2f2"       # خلفية خطأ
-    INFO = "#3498db"              # معلومات (أزرق)
-    INFO_LIGHT = "#ebf5fb"        # خلفية معلومات
-    
-    # ألوان خاصة - Special Colors
-    HEADER_BG = "#D9E1F2"         # خلفية الجداول (أزرق فاتح)
-    ACCENT = "#2c3e50"            # لون التمييز (أزرق داكن)
-    LINK = "#2980b9"              # روابط
-    
-    # ألوان الأزرار الخاصة - Special Button Colors
-    BUTTON_PURPLE = "#9b59b6"     # زر بنفسجي (طباعة)
-    BUTTON_GREEN = "#27ae60"      # زر أخضر (تصدير Excel)
-    BUTTON_BLUE = "#3498db"       # زر أزرق (تصدير Word)
+    # Status Colors
+    SUCCESS = "#16a34a"           # نجاح (أخضر)
+    SUCCESS_LIGHT = "#ecfdf5"     # خلفية نجاح
+    WARNING = "#f59e0b"           # تحذير (برتقالي)
+    WARNING_LIGHT = "#fffbeb"     # خلفية تحذير
+    ERROR = "#ef4444"             # خطأ (أحمر)
+    ERROR_LIGHT = "#fff1f2"       # خلفية خطأ
+    INFO = "#0284c7"              # accent blue (deeper)
+    INFO_LIGHT = "#eff8ff"        # subtle info surface
+
+    # Special Colors
+    HEADER_BG = "#f1f5f9"         # table header (light gray)
+    ACCENT = "#2563eb"            # vivid blue accent
+    LINK = "#2563eb"              # links (accent)
+
+    # Button Colors
+    BUTTON_PURPLE = "#7c3aed"
+    BUTTON_GREEN = "#10b981"
+    BUTTON_BLUE = "#2563eb"
 
 
 # =============================================================================
@@ -84,7 +84,7 @@ class FontSizes:
     TITLE_SMALL = 14              # عنوان صغير
     
     # أحجام النص
-    BODY = 12                     # نص عادي
+    BODY = 14                     # نص عادي (slightly larger for readability)
     BODY_SMALL = 11               # نص صغير
     CAPTION = 10                  # تعليق
     SMALL = 9                     # صغير جداً
@@ -106,10 +106,10 @@ class FontFamilies:
     """عائلات الخطوط المستخدمة"""
     
     # الخط الافتراضي
-    DEFAULT = "Arial"
-    
+    DEFAULT = "Segoe UI"
+
     # خطوط عربية
-    ARABIC = "Arial"              # يدعم العربية
+    ARABIC = "Segoe UI"           # يدعم العربية
     ARABIC_ALT = "Tahoma"         # بديل عربي
     
     # خطوط أحادية المسافة (للكود)

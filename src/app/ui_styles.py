@@ -16,11 +16,13 @@ MAIN_STYLESHEET = f"""
     QMainWindow {{
         background-color: {COLORS.BACKGROUND};
     }}
-    
-    /* العناصر العامة */
+
+    /* عناصر الواجهة العامة - خطوط وحدات ألوان مودرن */
     QWidget {{
         background-color: {COLORS.BACKGROUND};
         color: {COLORS.TEXT_PRIMARY};
+        font-family: 'Segoe UI', Arial, sans-serif;
+        font-size: {FONT_SIZES.BODY}px;
     }}
     
     /* شريط القوائم */
@@ -48,7 +50,7 @@ MAIN_STYLESHEET = f"""
     QToolBar {{
         background-color: {COLORS.BACKGROUND_DARK};
         border: 1px solid {COLORS.BORDER};
-        spacing: 3px;
+        spacing: 6px;
     }}
     
     /* حقول الإدخال */
@@ -98,20 +100,21 @@ MAIN_STYLESHEET = f"""
     
     /* الأزرار */
     QPushButton {{
-        background-color: {COLORS.SECONDARY};
+        background-color: {COLORS.ACCENT};
         color: {COLORS.TEXT_WHITE};
-        border: 1px solid {COLORS.BORDER_DARK};
-        border-radius: {DIMENSIONS.BORDER_RADIUS_MEDIUM}px;
+        border: 1px solid {COLORS.BORDER};
+        border-radius: {DIMENSIONS.BORDER_RADIUS_LARGE}px;
         padding: {DIMENSIONS.PADDING_MEDIUM}px {DIMENSIONS.PADDING_LARGE}px;
-        font-weight: bold;
+        font-weight: 600;
+        min-height: {DIMENSIONS.BUTTON_HEIGHT}px;
     }}
     
     QPushButton:hover {{
-        background-color: {COLORS.PRIMARY_LIGHT};
+        background-color: {COLORS.BUTTON_BLUE};
     }}
     
     QPushButton:pressed {{
-        background-color: {COLORS.PRIMARY};
+        background-color: {COLORS.BUTTON_BLUE};
     }}
     
     QPushButton:disabled {{
@@ -128,12 +131,12 @@ MAIN_STYLESHEET = f"""
     }}
     
     QTableWidget::item:selected {{
-        background-color: {COLORS.SECONDARY};
+        background-color: {COLORS.ACCENT};
         color: {COLORS.TEXT_WHITE};
     }}
     
     QHeaderView::section {{
-        background-color: {COLORS.BACKGROUND_DARK};
+        background-color: {COLORS.HEADER_BG};
         color: {COLORS.TEXT_PRIMARY};
         padding: {DIMENSIONS.PADDING_MEDIUM}px;
         border: 1px solid {COLORS.BORDER};
@@ -251,7 +254,7 @@ MAIN_STYLESHEET = f"""
     }}
     
     QListWidget::item:selected {{
-        background-color: {COLORS.SECONDARY};
+        background-color: {COLORS.ACCENT};
         color: {COLORS.TEXT_WHITE};
     }}
     
@@ -277,6 +280,19 @@ MAIN_STYLESHEET = f"""
     
     QTabBar::tab:selected {{
         background-color: {COLORS.BACKGROUND};
+    }}
+    
+    /* نمط عصري للخانات والنوافذ الحوارية */
+    QDialog {{
+        background-color: {COLORS.BACKGROUND};
+        border: 1px solid {COLORS.BORDER};
+        border-radius: {DIMENSIONS.BORDER_RADIUS_LARGE}px;
+    }}
+
+    /* إبراز الروابط والأزرار التفاعلية */
+    QLabel#linkLabel {{
+        color: {COLORS.LINK};
+        text-decoration: underline;
     }}
 """
 
