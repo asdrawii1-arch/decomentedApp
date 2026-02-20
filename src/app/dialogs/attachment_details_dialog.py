@@ -46,11 +46,45 @@ class AttachmentDetailsDialog(QDialog):
         self.setWindowTitle('معلومات المرفقات')
         self.setGeometry(100, 100, 950, 650)
         self._init_ui()
+        self.apply_dialog_styles()
         self.load_attachment(self.current_index)
+
+    def apply_dialog_styles(self):
+        """Apply light-theme styles to this dialog"""
+        self.setStyleSheet(f"""
+            QDialog {{
+                background-color: {COLORS.BACKGROUND_LIGHT};
+                color: {COLORS.TEXT_PRIMARY};
+                font-size: {FONT_SIZES.BODY}px;
+                font-family: 'Segoe UI', Arial, sans-serif;
+            }}
+            QPushButton {{
+                background-color: {COLORS.ACCENT};
+                color: {COLORS.TEXT_WHITE};
+                border: 1px solid {COLORS.BORDER};
+                border-radius: {DIMENSIONS.BORDER_RADIUS_MEDIUM}px;
+                padding: {DIMENSIONS.PADDING_SMALL}px {DIMENSIONS.PADDING_MEDIUM}px;
+                min-height: {DIMENSIONS.BUTTON_HEIGHT}px;
+            }}
+            QLineEdit, QTextEdit, QComboBox {{
+                background-color: {COLORS.BACKGROUND_WHITE};
+                color: {COLORS.TEXT_PRIMARY};
+                border: 1px solid {COLORS.BORDER};
+                border-radius: {DIMENSIONS.BORDER_RADIUS_MEDIUM}px;
+            }}
+            QLabel {{
+                color: {COLORS.TEXT_PRIMARY};
+            }}
+        """)
     
     def _init_ui(self):
         """إنشاء واجهة المستخدم"""
         main_layout = QVBoxLayout()
+        main_layout.setSpacing(DIMENSIONS.PADDING_MEDIUM)
+        main_layout.setContentsMargins(
+            DIMENSIONS.MARGIN_MEDIUM, DIMENSIONS.MARGIN_MEDIUM,
+            DIMENSIONS.MARGIN_MEDIUM, DIMENSIONS.MARGIN_MEDIUM
+        )
         
         # شريط العنوان
         self._create_header(main_layout)

@@ -22,52 +22,58 @@ from typing import Dict
 class Colors:
     """ثوابت الألوان المستخدمة في التطبيق"""
     
-    # Primary Colors - Modern light theme palette
-    PRIMARY = "#ffffff"           # white primary surface
-    PRIMARY_DARK = "#f8fafc"      # very light gray for subtle surfaces
-    PRIMARY_LIGHT = "#ffffff"     # same as primary for surfaces
+    # Primary Colors - Enhanced modern palette
+    PRIMARY = "#ffffff"           # pure white primary surface
+    PRIMARY_DARK = "#f1f5f9"      # light gray for subtle surfaces
+    PRIMARY_LIGHT = "#fefefe"     # slightly off-white for depth
 
     # Secondary tones for panels and surfaces
-    SECONDARY = "#f3f6f9"
-    SECONDARY_DARK = "#eef2f6"
-    SECONDARY_LIGHT = "#fbfdff"
+    SECONDARY = "#e2e8f0"         # refined light gray
+    SECONDARY_DARK = "#cbd5e1"    # medium gray
+    SECONDARY_LIGHT = "#f8fafc"   # very light gray
 
     # Backgrounds
     BACKGROUND = "#f8fafc"        # app main background (very light)
-    BACKGROUND_DARK = "#eef2f6"   # toolbar / elevated surface
+    BACKGROUND_DARK = "#e2e8f0"   # toolbar / elevated surface - darker for contrast
     BACKGROUND_LIGHT = "#ffffff"  # panel background (white)
     BACKGROUND_WHITE = "#ffffff"  # explicit white surface
 
-    # Text
-    TEXT_PRIMARY = "#0f1724"      # dark primary text (rich charcoal)
-    TEXT_SECONDARY = "#475569"    # secondary text (muted slate)
-    TEXT_MUTED = "#6b7280"        # muted text (gray)
+    # Text - Enhanced contrast for better readability
+    TEXT_PRIMARY = "#1e293b"      # darker primary text (slate 800)
+    TEXT_SECONDARY = "#475569"    # secondary text (slate 600)
+    TEXT_MUTED = "#64748b"        # muted text (slate 500)
     TEXT_WHITE = "#ffffff"        # white
+    TEXT_CONTRAST = "#0f172a"     # maximum contrast dark (slate 900)
 
-    # Borders
-    BORDER = "#e6eef6"           # subtle border
-    BORDER_LIGHT = "#ecf0f4"
-    BORDER_DARK = "#d6e3ef"
+    # Borders - Refined for better definition
+    BORDER = "#d1d5db"           # more visible border (gray 300)
+    BORDER_LIGHT = "#e5e7eb"     # light border (gray 200)
+    BORDER_DARK = "#9ca3af"      # dark border (gray 400)
     
-    # Status Colors
-    SUCCESS = "#16a34a"           # نجاح (أخضر)
-    SUCCESS_LIGHT = "#ecfdf5"     # خلفية نجاح
-    WARNING = "#f59e0b"           # تحذير (برتقالي)
-    WARNING_LIGHT = "#fffbeb"     # خلفية تحذير
-    ERROR = "#ef4444"             # خطأ (أحمر)
-    ERROR_LIGHT = "#fff1f2"       # خلفية خطأ
-    INFO = "#0284c7"              # accent blue (deeper)
-    INFO_LIGHT = "#eff8ff"        # subtle info surface
+    # Status Colors - Enhanced visibility
+    SUCCESS = "#059669"           # نجاح (emerald 600)
+    SUCCESS_LIGHT = "#d1fae5"     # خلفية نجاح (emerald 100)
+    WARNING = "#d97706"           # تحذير (amber 600)
+    WARNING_LIGHT = "#fef3c7"     # خلفية تحذير (amber 100)
+    ERROR = "#dc2626"             # خطأ (red 600)
+    ERROR_LIGHT = "#fee2e2"       # خلفية خطأ (red 100)
+    INFO = "#0284c7"              # info blue (sky 600)
+    INFO_LIGHT = "#e0f2fe"        # subtle info surface (sky 50)
 
-    # Special Colors
-    HEADER_BG = "#f1f5f9"         # table header (light gray)
-    ACCENT = "#2563eb"            # vivid blue accent
-    LINK = "#2563eb"              # links (accent)
+    # Special Colors - Enhanced for better UX
+    HEADER_BG = "#f1f5f9"         # table header (refined)
+    ACCENT = "#3b82f6"            # modern blue accent (blue 500)
+    LINK = "#2563eb"              # link blue (blue 600)
+    
+    # Table Selection - Improved readability
+    SELECTION_BG = "#dbeafe"      # light blue selection (blue 100)
+    SELECTION_TEXT = "#1e293b"    # dark text for selection (slate 800)
+    HOVER_BG = "#f1f5f9"          # subtle hover (slate 50)
 
-    # Button Colors
-    BUTTON_PURPLE = "#7c3aed"
-    BUTTON_GREEN = "#10b981"
-    BUTTON_BLUE = "#2563eb"
+    # Button Colors - Refined palette
+    BUTTON_PURPLE = "#7c3aed"     # violet 600
+    BUTTON_GREEN = "#059669"      # emerald 600
+    BUTTON_BLUE = "#3b82f6"       # blue 500
 
 
 # =============================================================================
@@ -76,25 +82,25 @@ class Colors:
 
 @dataclass(frozen=True)
 class FontSizes:
-    """أحجام الخطوط بالبكسل"""
+    """أحجام الخطوط بالبكسل - Enhanced for better readability"""
     
     # أحجام العناوين
-    TITLE_LARGE = 18              # عنوان كبير
-    TITLE = 16                    # عنوان عادي
-    TITLE_SMALL = 14              # عنوان صغير
+    TITLE_LARGE = 20              # عنوان كبير (increased)
+    TITLE = 18                    # عنوان عادي (increased)
+    TITLE_SMALL = 16              # عنوان صغير (increased)
     
-    # أحجام النص
-    BODY = 14                     # نص عادي (slightly larger for readability)
-    BODY_SMALL = 11               # نص صغير
-    CAPTION = 10                  # تعليق
-    SMALL = 9                     # صغير جداً
-    TINY = 7                      # صغير للغاية (للجداول)
+    # أحجام النص - Enhanced for readability
+    BODY = 14                     # نص عادي
+    BODY_SMALL = 12               # نص صغير (increased from 11)
+    CAPTION = 11                  # تعليق (increased from 10)
+    SMALL = 10                    # صغير (increased from 9)
+    TINY = 8                      # صغير للغاية (increased from 7)
     
-    # أحجام خاصة
+    # أحجام خاصة - Enhanced
     BUTTON = 14                   # أزرار
-    INPUT = 12                    # حقول الإدخال
-    TABLE_HEADER = 11             # رأس الجدول
-    TABLE_CELL = 10               # خلايا الجدول
+    INPUT = 13                    # حقول الإدخال (increased)
+    TABLE_HEADER = 13             # رأس الجدول (increased from 11)
+    TABLE_CELL = 12               # خلايا الجدول (increased from 10)
 
 
 # =============================================================================
@@ -128,16 +134,16 @@ class Dimensions:
     """الأبعاد والمقاسات بالبكسل"""
     
     # الهوامش - Margins
-    MARGIN_SMALL = 5
-    MARGIN_MEDIUM = 10
-    MARGIN_LARGE = 15
-    MARGIN_XLARGE = 20
+    MARGIN_SMALL = 6
+    MARGIN_MEDIUM = 12
+    MARGIN_LARGE = 18
+    MARGIN_XLARGE = 24
     
     # الحشو - Padding
-    PADDING_SMALL = 3
-    PADDING_MEDIUM = 6
-    PADDING_LARGE = 10
-    PADDING_XLARGE = 15
+    PADDING_SMALL = 6
+    PADDING_MEDIUM = 10
+    PADDING_LARGE = 14
+    PADDING_XLARGE = 20
     
     # الحدود - Borders
     BORDER_RADIUS_SMALL = 2
@@ -156,7 +162,7 @@ class Dimensions:
     
     # أحجام العناصر - Element Sizes
     BUTTON_HEIGHT = 32
-    INPUT_HEIGHT = 28
+    INPUT_HEIGHT = 34
     ROW_HEIGHT = 25
     THUMBNAIL_WIDTH = 150
     THUMBNAIL_HEIGHT = 200

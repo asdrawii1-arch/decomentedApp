@@ -49,12 +49,42 @@ class DestructionFormDialog(QDialog):
         self.setMinimumSize(900, 700)
         
         self._init_ui()
+        self.apply_dialog_styles()
         self._load_selected_documents()
         self._update_pages_info()
+
+    def apply_dialog_styles(self):
+        """Apply light-theme styles to this dialog"""
+        self.setStyleSheet(f"""
+            QDialog {{
+                background-color: {COLORS.BACKGROUND};
+                color: {COLORS.TEXT_PRIMARY};
+                font-size: {FONT_SIZES.BODY}px;
+                font-family: 'Segoe UI', Arial, sans-serif;
+            }}
+            QPushButton {{
+                background-color: {COLORS.ACCENT};
+                color: {COLORS.TEXT_WHITE};
+                border: 1px solid {COLORS.BORDER};
+                border-radius: {DIMENSIONS.BORDER_RADIUS_MEDIUM}px;
+                padding: {DIMENSIONS.PADDING_SMALL}px {DIMENSIONS.PADDING_MEDIUM}px;
+                min-height: {DIMENSIONS.BUTTON_HEIGHT}px;
+            }}
+            QLineEdit, QTableWidget {{
+                background-color: {COLORS.BACKGROUND_WHITE};
+                color: {COLORS.TEXT_PRIMARY};
+                border: 1px solid {COLORS.BORDER};
+            }}
+        """)
     
     def _init_ui(self):
         """إنشاء واجهة المستخدم"""
         layout = QVBoxLayout()
+        layout.setSpacing(DIMENSIONS.PADDING_MEDIUM)
+        layout.setContentsMargins(
+            DIMENSIONS.MARGIN_MEDIUM, DIMENSIONS.MARGIN_MEDIUM,
+            DIMENSIONS.MARGIN_MEDIUM, DIMENSIONS.MARGIN_MEDIUM
+        )
         
         # عنوان النموذج
         self._create_title(layout)

@@ -17,12 +17,13 @@ MAIN_STYLESHEET = f"""
         background-color: {COLORS.BACKGROUND};
     }}
 
-    /* عناصر الواجهة العامة - خطوط وحدات ألوان مودرن */
+    /* عناصر الواجهة العامة - خطوط وحدود ألوان محدثة */
     QWidget {{
         background-color: {COLORS.BACKGROUND};
         color: {COLORS.TEXT_PRIMARY};
-        font-family: 'Segoe UI', Arial, sans-serif;
+        font-family: 'Segoe UI', 'Tahoma', Arial, sans-serif;
         font-size: {FONT_SIZES.BODY}px;
+        font-weight: 400;
     }}
     
     /* شريط القوائم */
@@ -53,18 +54,26 @@ MAIN_STYLESHEET = f"""
         spacing: 6px;
     }}
     
-    /* حقول الإدخال */
+    /* حقول الإدخال - محسّنة للوضوح */
     QLineEdit {{
         background-color: {COLORS.BACKGROUND_WHITE};
         color: {COLORS.TEXT_PRIMARY};
         border: 1px solid {COLORS.BORDER};
         border-radius: {DIMENSIONS.BORDER_RADIUS_MEDIUM}px;
         padding: {DIMENSIONS.PADDING_MEDIUM}px;
+        font-size: {FONT_SIZES.INPUT}px;
+        selection-background-color: {COLORS.SELECTION_BG};
+        selection-color: {COLORS.SELECTION_TEXT};
     }}
     
     QLineEdit:focus {{
-        border: {DIMENSIONS.BORDER_WIDTH_FOCUS}px solid {COLORS.BORDER_DARK};
+        border: {DIMENSIONS.BORDER_WIDTH_FOCUS}px solid {COLORS.ACCENT};
         background-color: {COLORS.BACKGROUND_WHITE};
+        outline: none;
+    }}
+    
+    QLineEdit:hover {{
+        border-color: {COLORS.BORDER_DARK};
     }}
     
     /* محرر النص */
@@ -79,38 +88,68 @@ MAIN_STYLESHEET = f"""
         border: {DIMENSIONS.BORDER_WIDTH_FOCUS}px solid {COLORS.BORDER_DARK};
     }}
     
-    /* القوائم المنسدلة */
+    /* القوائم المنسدلة - محسّنة */
     QComboBox {{
         background-color: {COLORS.BACKGROUND_WHITE};
         color: {COLORS.TEXT_PRIMARY};
         border: 1px solid {COLORS.BORDER};
         border-radius: {DIMENSIONS.BORDER_RADIUS_MEDIUM}px;
         padding: {DIMENSIONS.PADDING_MEDIUM}px;
+        min-width: 120px;
+        font-size: {FONT_SIZES.INPUT}px;
+    }}
+    
+    QComboBox:hover {{
+        border-color: {COLORS.BORDER_DARK};
+        background-color: {COLORS.HOVER_BG};
+    }}
+    
+    QComboBox:focus {{
+        border: {DIMENSIONS.BORDER_WIDTH_FOCUS}px solid {COLORS.ACCENT};
     }}
     
     QComboBox::drop-down {{
         border: none;
+        width: 25px;
+        border-left: 1px solid {COLORS.BORDER};
+        border-top-right-radius: {DIMENSIONS.BORDER_RADIUS_MEDIUM}px;
+        border-bottom-right-radius: {DIMENSIONS.BORDER_RADIUS_MEDIUM}px;
+        background-color: {COLORS.SECONDARY};
+    }}
+    
+    QComboBox::down-arrow {{
+        width: 12px;
+        height: 12px;
+        image: none;
+        border-left: 4px solid transparent;
+        border-right: 4px solid transparent;
+        border-top: 6px solid {COLORS.TEXT_SECONDARY};
     }}
     
     QComboBox QAbstractItemView {{
         background-color: {COLORS.BACKGROUND_WHITE};
         color: {COLORS.TEXT_PRIMARY};
-        selection-background-color: {COLORS.SECONDARY};
+        selection-background-color: {COLORS.SELECTION_BG};
+        selection-color: {COLORS.SELECTION_TEXT};
+        border: 1px solid {COLORS.BORDER_DARK};
+        border-radius: {DIMENSIONS.BORDER_RADIUS_MEDIUM}px;
     }}
     
-    /* الأزرار */
+    /* الأزرار - محسّنة */
     QPushButton {{
         background-color: {COLORS.ACCENT};
         color: {COLORS.TEXT_WHITE};
-        border: 1px solid {COLORS.BORDER};
+        border: 1px solid {COLORS.ACCENT};
         border-radius: {DIMENSIONS.BORDER_RADIUS_LARGE}px;
         padding: {DIMENSIONS.PADDING_MEDIUM}px {DIMENSIONS.PADDING_LARGE}px;
         font-weight: 600;
+        font-size: {FONT_SIZES.BUTTON}px;
         min-height: {DIMENSIONS.BUTTON_HEIGHT}px;
     }}
     
     QPushButton:hover {{
         background-color: {COLORS.BUTTON_BLUE};
+        border-color: {COLORS.BUTTON_BLUE};
     }}
     
     QPushButton:pressed {{
@@ -120,26 +159,61 @@ MAIN_STYLESHEET = f"""
     QPushButton:disabled {{
         background-color: {COLORS.BACKGROUND_DARK};
         color: {COLORS.TEXT_MUTED};
+        border-color: {COLORS.BORDER};
     }}
     
-    /* الجداول */
+    /* الجداول - محسّنة لقابلية القراءة */
     QTableWidget {{
         background-color: {COLORS.BACKGROUND_WHITE};
         alternate-background-color: {COLORS.BACKGROUND_LIGHT};
         gridline-color: {COLORS.BORDER_LIGHT};
         border: 1px solid {COLORS.BORDER};
+        border-radius: {DIMENSIONS.BORDER_RADIUS_MEDIUM}px;
+        font-size: {FONT_SIZES.TABLE_CELL}px;
+        selection-background-color: {COLORS.SELECTION_BG};
+        selection-color: {COLORS.SELECTION_TEXT};
     }}
     
+    /* تحديد الصفوف - قابلية قراءة محسّنة */
     QTableWidget::item:selected {{
-        background-color: {COLORS.ACCENT};
-        color: {COLORS.TEXT_WHITE};
+        background-color: {COLORS.SELECTION_BG};
+        color: {COLORS.SELECTION_TEXT};
+        border: none;
     }}
     
+    QTableWidget::item:hover {{
+        background-color: {COLORS.HOVER_BG};
+        color: {COLORS.TEXT_PRIMARY};
+    }}
+    
+    /* تحديد عدة صفوف */
+    QTableWidget::item:selected:focus {{
+        background-color: {COLORS.SELECTION_BG};
+        color: {COLORS.SELECTION_TEXT};
+        border: 1px solid {COLORS.ACCENT};
+    }}
+    
+    /* خلايا الجدول */
+    QTableWidget::item {{
+        padding: 8px 12px;
+        border: none;
+        font-size: {FONT_SIZES.TABLE_CELL}px;
+        color: {COLORS.TEXT_PRIMARY};
+    }}
+    
+    /* رأس الجدول - محسّن */
     QHeaderView::section {{
         background-color: {COLORS.HEADER_BG};
         color: {COLORS.TEXT_PRIMARY};
         padding: {DIMENSIONS.PADDING_MEDIUM}px;
         border: 1px solid {COLORS.BORDER};
+        font-weight: 600;
+        font-size: {FONT_SIZES.TABLE_HEADER}px;
+        border-bottom: 2px solid {COLORS.BORDER_DARK};
+    }}
+    
+    QHeaderView::section:hover {{
+        background-color: {COLORS.SECONDARY};
     }}
     
     /* أشرطة التمرير العمودية */

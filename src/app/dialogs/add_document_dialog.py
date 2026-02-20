@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 
-from ..constants import COLORS, ICONS, APP_SETTINGS
+from ..constants import COLORS, ICONS, APP_SETTINGS, FONT_SIZES, DIMENSIONS
 from ..ui_styles import SCANNER_STATUS_STYLES, BUTTON_STYLES
 from .utils import choose_year_folder
 from .attachment_details_dialog import AttachmentDetailsDialog
@@ -73,10 +73,44 @@ class AddDocumentDialog(QDialog):
         self.selected_year_folder = None
         
         self._init_ui()
+        self.apply_dialog_styles()
+
+    def apply_dialog_styles(self):
+        """Apply dialog-level styles to match the light theme"""
+        self.setStyleSheet(f"""
+            QDialog {{
+                background-color: {COLORS.BACKGROUND_LIGHT};
+                color: {COLORS.TEXT_PRIMARY};
+                font-size: {FONT_SIZES.BODY}px;
+                font-family: 'Segoe UI', Arial, sans-serif;
+            }}
+            QPushButton {{
+                background-color: {COLORS.ACCENT};
+                color: {COLORS.TEXT_WHITE};
+                border: 1px solid {COLORS.BORDER};
+                border-radius: {DIMENSIONS.BORDER_RADIUS_MEDIUM}px;
+                padding: {DIMENSIONS.PADDING_SMALL}px {DIMENSIONS.PADDING_MEDIUM}px;
+                min-height: {DIMENSIONS.BUTTON_HEIGHT}px;
+            }}
+            QLineEdit, QTextEdit, QComboBox {{
+                background-color: {COLORS.BACKGROUND_WHITE};
+                color: {COLORS.TEXT_PRIMARY};
+                border: 1px solid {COLORS.BORDER};
+                border-radius: {DIMENSIONS.BORDER_RADIUS_MEDIUM}px;
+            }}
+        """)
     
     def _init_ui(self):
         """إنشاء واجهة المستخدم"""
         layout = QFormLayout()
+        try:
+            layout.setSpacing(DIMENSIONS.PADDING_MEDIUM)
+            layout.setContentsMargins(
+                DIMENSIONS.MARGIN_MEDIUM, DIMENSIONS.MARGIN_MEDIUM,
+                DIMENSIONS.MARGIN_MEDIUM, DIMENSIONS.MARGIN_MEDIUM
+            )
+        except Exception:
+            pass
         
         # حقول الإدخال الأساسية
         self._create_basic_fields(layout)

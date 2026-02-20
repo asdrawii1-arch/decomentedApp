@@ -132,61 +132,64 @@ class MainWindow(QMainWindow):
         destruction_form_btn.clicked.connect(self.open_destruction_form)
         toolbar_layout.addWidget(destruction_form_btn)
         
-        # إضافة قائمة السنوات بتصميم أنيق
+        # إضافة قائمة السنوات بتصميم أنيق ومحسّن
         year_label = QLabel('📅 السنة:')
-        year_label.setStyleSheet("""
-            color: #2c3e50;
+        year_label.setStyleSheet(f"""
+            color: {COLORS.TEXT_PRIMARY};
             font-weight: bold;
-            font-size: 13px;
+            font-size: {FONT_SIZES.BODY}px;
             padding: 5px;
         """)
         toolbar_layout.addWidget(year_label)
         
         self.years_combo = QComboBox()
-        self.years_combo.setStyleSheet("""
-            QComboBox {
-                background-color: #ecf0f1;
-                border: 2px solid #bdc3c7;
+        self.years_combo.setStyleSheet(f"""
+            QComboBox {{
+                background-color: {COLORS.BACKGROUND_WHITE};
+                border: 2px solid {COLORS.BORDER};
                 border-radius: 8px;
-                padding: 6px 12px;
-                font-size: 12px;
-                font-weight: bold;
-                color: #2c3e50;
-                min-width: 120px;
-                max-width: 150px;
-            }
-            QComboBox:hover {
-                border-color: #3498db;
-                background-color: #e8f4fd;
-            }
-            QComboBox:focus {
-                border-color: #2980b9;
-                background-color: #d5e7f7;
-            }
-            QComboBox::drop-down {
+                padding: 8px 14px;
+                font-size: {FONT_SIZES.INPUT}px;
+                font-weight: 600;
+                color: {COLORS.TEXT_PRIMARY};
+                min-width: 130px;
+                max-width: 160px;
+            }}
+            QComboBox:hover {{
+                border-color: {COLORS.ACCENT};
+                background-color: {COLORS.HOVER_BG};
+            }}
+            QComboBox:focus {{
+                border-color: {COLORS.ACCENT};
+                background-color: {COLORS.BACKGROUND_WHITE};
+            }}
+            QComboBox::drop-down {{
                 subcontrol-origin: padding;
                 subcontrol-position: top right;
-                width: 25px;
+                width: 30px;
                 border-left-width: 1px;
-                border-left-color: #bdc3c7;
+                border-left-color: {COLORS.BORDER};
                 border-left-style: solid;
                 border-top-right-radius: 8px;
                 border-bottom-right-radius: 8px;
-                background-color: #d5e7f7;
-            }
-            QComboBox::down-arrow {
-                image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAwAAAAGCAYAAAD37n+BAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAAdgAAAHYBTnsmCAAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAABYSURBVBiVY/z//z8DBQAggJiBEgAQQECGEQAggJiBEgAQQMyASgBAgBGNAAggZkAlACCAGFEJAAggZkQlgCCAGJEJAAggRmQCCMQmgEAcAmhgAAMAAP//A1QnWVWFLCJ8AAAAAElFTkSuQmCC);
+                background-color: {COLORS.SECONDARY};
+            }}
+            QComboBox::down-arrow {{
                 width: 12px;
-                height: 6px;
-            }
-            QComboBox QAbstractItemView {
-                border: 2px solid #3498db;
+                height: 8px;
+                border-left: 4px solid transparent;
+                border-right: 4px solid transparent;
+                border-top: 6px solid {COLORS.TEXT_SECONDARY};
+            }}
+            QComboBox QAbstractItemView {{
+                border: 2px solid {COLORS.ACCENT};
                 border-radius: 6px;
-                background-color: #ffffff;
-                selection-background-color: #3498db;
-                selection-color: white;
+                background-color: {COLORS.BACKGROUND_WHITE};
+                selection-background-color: {COLORS.SELECTION_BG};
+                selection-color: {COLORS.SELECTION_TEXT};
                 padding: 4px;
-            }
+                font-size: {FONT_SIZES.INPUT}px;
+            }}
         """)
         self.years_combo.currentTextChanged.connect(self.on_year_changed)
         toolbar_layout.addWidget(self.years_combo)
@@ -215,21 +218,61 @@ class MainWindow(QMainWindow):
 
         # جدول الوثائق
         self.documents_table = QTableWidget()
-        self.documents_table.setColumnCount(8)
+        self.documents_table.setColumnCount(9)  # زيادة عدد الأعمدة لإضافة التسلسل
         self.documents_table.setHorizontalHeaderLabels([
-            '☑', 'رقم الوثيقة', 'التاريخ', 'المضمون', 'جهة الإصدار', 'التصنيف', 'المادة القانونية', 'عدد الصور'
+            'ت', '☑', 'رقم الوثيقة', 'التاريخ', 'المضمون', 'جهة الإصدار', 'التصنيف', 'المادة القانونية', '📷 الصور'
         ])
-        self.documents_table.setColumnWidth(0, 40)  # Checkbox column
-        self.documents_table.setColumnWidth(1, 100)
-        self.documents_table.setColumnWidth(2, 100)
-        self.documents_table.setColumnWidth(3, 200)
-        self.documents_table.setColumnWidth(4, 150)
-        self.documents_table.setColumnWidth(5, 100)
-        self.documents_table.setColumnWidth(6, 180)
-        self.documents_table.setColumnWidth(7, 80)
+        # تحسين عرض الأعمدة مع إضافة عمود التسلسل
+        self.documents_table.setColumnWidth(0, 60)   # عمود التسلسل
+        self.documents_table.setColumnWidth(1, 50)   # Checkbox column
+        self.documents_table.setColumnWidth(2, 140)  # رقم الوثيقة
+        self.documents_table.setColumnWidth(3, 120)  # التاريخ
+        self.documents_table.setColumnWidth(4, 220)  # المضمون
+        self.documents_table.setColumnWidth(5, 160)  # جهة الإصدار
+        self.documents_table.setColumnWidth(6, 110)  # التصنيف
+        self.documents_table.setColumnWidth(7, 190)  # المادة القانونية
+        self.documents_table.setColumnWidth(8, 90)   # عدد الصور
         self.documents_table.setAlternatingRowColors(True)
         self.documents_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.documents_table.setSelectionMode(QTableWidget.SelectionMode.ExtendedSelection)
+        
+        # تحسين مظهر الجدول مع حدود بارزة
+        self.documents_table.verticalHeader().setVisible(False)  # إخفاء الرقم التسلسلي الافتراضي
+        self.documents_table.setShowGrid(True)  # عرض الشبكة
+        self.documents_table.setGridStyle(Qt.PenStyle.SolidLine)  # نمط خطوط الشبكة
+        
+        # تطبيق نمط خاص للجدول مع حدود بارزة وتحسينات اللون
+        table_style = f"""
+            QTableWidget {{
+                gridline-color: {COLORS.BORDER_DARK};
+                border: 2px solid {COLORS.BORDER_DARK};
+                border-radius: 8px;
+                background-color: {COLORS.BACKGROUND_WHITE};
+            }}
+            QTableWidget::item {{
+                border: 1px solid {COLORS.BORDER};
+                padding: 8px;
+                font-size: {FONT_SIZES.TABLE_CELL}px;
+            }}
+            QHeaderView::section {{
+                background-color: {COLORS.HEADER_BG};
+                border: 2px solid {COLORS.BORDER_DARK};
+                padding: 12px;
+                font-weight: bold;
+                font-size: {FONT_SIZES.TABLE_HEADER}px;
+            }}
+            /* تحسين عمود التسلسل - لون أغمق */
+            QTableWidget::item:first-child {{
+                background-color: {COLORS.SECONDARY};
+                font-weight: bold;
+                color: {COLORS.TEXT_PRIMARY};
+            }}
+        """
+        self.documents_table.setStyleSheet(table_style)
+        
+        # تحسين ارتفاع الصفوف لقابلية قراءة أفضل
+        self.documents_table.setRowHeight(0, 35)  # زيادة ارتفاع الصفوف
+        
         self.documents_table.selectionModel().selectionChanged.connect(self.on_row_selection_changed)
         
         # ضع الجدول داخل تخطيط عمودي (للسماح بعناصر إضافية إن لزم)
@@ -264,38 +307,77 @@ class MainWindow(QMainWindow):
             row = self.documents_table.rowCount()
             self.documents_table.insertRow(row)
             
-            # Checkbox column
-            checkbox = QCheckBox()
-            checkbox.setStyleSheet('margin-left: 10px;')
-            checkbox.stateChanged.connect(lambda state, row=row: self.on_checkbox_changed(row, state))
-            self.documents_table.setCellWidget(row, 0, checkbox)
+            # تحسين ارتفاع الصف الجديد
+            self.documents_table.setRowHeight(row, 38)  # ارتفاع مناسب لقابلية القراءة
             
-            # رقم الوثيقة (من اسم الوثيقة)
+            # عمود التسلسل (عموح 0) - مع خلفية أغمق
+            sequence_item = QTableWidgetItem(str(row + 1))
+            sequence_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter)
+            sequence_item.setBackground(QColor(COLORS.SECONDARY_DARK))  # خلفية أغمق
+            sequence_item.setForeground(QColor(COLORS.TEXT_PRIMARY))
+            self.documents_table.setItem(row, 0, sequence_item)
+            
+            # Checkbox column (عمود 1) - مع تحسين المظهر
+            checkbox = QCheckBox()
+            checkbox.setStyleSheet(f"""
+                QCheckBox::indicator {{
+                    width: 20px;
+                    height: 20px;
+                }}
+                QCheckBox::indicator:unchecked {{
+                    background-color: {COLORS.BACKGROUND_WHITE};
+                    border: 2px solid {COLORS.BORDER_DARK};
+                    border-radius: 4px;
+                }}
+                QCheckBox::indicator:checked {{
+                    background-color: {COLORS.SUCCESS};
+                    border: 2px solid {COLORS.SUCCESS};
+                    border-radius: 4px;
+                }}
+            """)
+            checkbox.stateChanged.connect(lambda state, row=row: self.on_checkbox_changed(row, state))
+            self.documents_table.setCellWidget(row, 1, checkbox)
+            
+            # رقم الوثيقة (من اسم الوثيقة) - عمود 2
             doc_name = doc[1] or ''
             # استخراج الرقم من اسم الوثيقة (مثل: "65 في 23-3-2025" -> "65")
             doc_number = doc_name.split()[0] if doc_name else ''
             item = QTableWidgetItem(doc_number)
             item.setData(Qt.ItemDataRole.UserRole, doc[0])  # احفظ معرف الوثيقة
-            self.documents_table.setItem(row, 1, item)
+            # تحسين محاذاة رقم الوثيقة
+            item.setTextAlignment(Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter)
+            self.documents_table.setItem(row, 2, item)
             
-            # التاريخ
-            self.documents_table.setItem(row, 2, QTableWidgetItem(doc[2] or ''))
+            # التاريخ - عمود 3
+            date_item = QTableWidgetItem(doc[2] or '')
+            date_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter)
+            self.documents_table.setItem(row, 3, date_item)
             
-            # المضمون (العنوان)
-            self.documents_table.setItem(row, 3, QTableWidgetItem(doc[3] or ''))
+            # المضمون (العنوان) - عمود 4
+            content_item = QTableWidgetItem(doc[3] or '')
+            content_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            self.documents_table.setItem(row, 4, content_item)
             
-            # جهة الإصدار
-            self.documents_table.setItem(row, 4, QTableWidgetItem(doc[4] or ''))
+            # جهة الإصدار - عمود 5
+            issuer_item = QTableWidgetItem(doc[4] or '')
+            issuer_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            self.documents_table.setItem(row, 5, issuer_item)
             
-            # التصنيف
-            self.documents_table.setItem(row, 5, QTableWidgetItem(doc[5] or ''))
+            # التصنيف - عمود 6
+            category_item = QTableWidgetItem(doc[5] or '')
+            category_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter)
+            self.documents_table.setItem(row, 6, category_item)
             
-            # المادة القانونية
-            self.documents_table.setItem(row, 6, QTableWidgetItem(doc[6] or ''))
+            # المادة القانونية - عمود 7
+            legal_item = QTableWidgetItem(doc[6] or '')
+            legal_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            self.documents_table.setItem(row, 7, legal_item)
             
-            # عدد الصور
+            # عدد الصور - عمود 8
             images = self.db.get_document_images(doc[0])
-            self.documents_table.setItem(row, 7, QTableWidgetItem(str(len(images))))
+            images_item = QTableWidgetItem(str(len(images)))
+            images_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter)
+            self.documents_table.setItem(row, 8, images_item)
             
             # Process events every 50 rows to keep UI responsive
             if idx % 50 == 0:
@@ -878,8 +960,8 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, 'تنبيه', 'يجب اختيار وثيقة أولاً')
             return
         
-        # احصل على معرف الوثيقة من البيانات المخزنة في الصف (column 1 now)
-        doc_id_item = self.documents_table.item(current_row, 1)
+        # احصل على معرف الوثيقة من البيانات المخزنة في الصف (column 2 now)
+        doc_id_item = self.documents_table.item(current_row, 2)
         if not doc_id_item or not doc_id_item.data(Qt.ItemDataRole.UserRole):
             QMessageBox.warning(self, 'خطأ', 'لم يتم العثور على معرف الوثيقة')
             return
@@ -995,7 +1077,7 @@ class MainWindow(QMainWindow):
         
         # تحديد جميع checkboxes
         for row in range(self.documents_table.rowCount()):
-            checkbox = self.documents_table.cellWidget(row, 0)
+            checkbox = self.documents_table.cellWidget(row, 1)  # Column 1 now has checkbox
             if checkbox:
                 checkbox.blockSignals(True)  # منع إرسال signals تجنباً للتداخل
                 checkbox.setChecked(True)
@@ -1008,7 +1090,7 @@ class MainWindow(QMainWindow):
         
         # إلغاء تحديد جميع checkboxes
         for row in range(self.documents_table.rowCount()):
-            checkbox = self.documents_table.cellWidget(row, 0)
+            checkbox = self.documents_table.cellWidget(row, 1)  # Column 1 now has checkbox
             if checkbox:
                 checkbox.blockSignals(True)  # منع إرسال signals تجنباً للتداخل
                 checkbox.setChecked(False)
@@ -1019,7 +1101,7 @@ class MainWindow(QMainWindow):
         # Get checked rows
         checked_rows = []
         for row in range(self.documents_table.rowCount()):
-            checkbox = self.documents_table.cellWidget(row, 0)
+            checkbox = self.documents_table.cellWidget(row, 1)  # Column 1 now has checkbox
             if checkbox and checkbox.isChecked():
                 checked_rows.append(row)
         
@@ -1039,7 +1121,7 @@ class MainWindow(QMainWindow):
             # Get doc IDs from checked rows
             doc_ids = []
             for row in checked_rows:
-                doc_id_item = self.documents_table.item(row, 1)  # Column 1 now has doc number
+                doc_id_item = self.documents_table.item(row, 2)  # Column 2 now has doc number
                 if doc_id_item:
                     doc_id = doc_id_item.data(Qt.ItemDataRole.UserRole)
                     if doc_id:
@@ -1108,13 +1190,39 @@ class MainWindow(QMainWindow):
             row = self.documents_table.rowCount()
             self.documents_table.insertRow(row)
             
-            # Checkbox column
-            checkbox = QCheckBox()
-            checkbox.setStyleSheet('margin-left: 10px;')
-            checkbox.stateChanged.connect(lambda state, row=row: self.on_checkbox_changed(row, state))
-            self.documents_table.setCellWidget(row, 0, checkbox)
+            # تحسين ارتفاع الصف الجديد
+            self.documents_table.setRowHeight(row, 38)
             
-            # رقم الوثيقة/المرفق
+            # عمود التسلسل (عمود 0) - مع خلفية أغمق
+            sequence_item = QTableWidgetItem(str(row + 1))
+            sequence_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter)
+            sequence_item.setBackground(QColor(COLORS.SECONDARY_DARK))  # خلفية أغمق
+            sequence_item.setForeground(QColor(COLORS.TEXT_PRIMARY))
+            self.documents_table.setItem(row, 0, sequence_item)
+            
+            # Checkbox column (عمود 1) - مع تحسين المظهر
+            checkbox = QCheckBox()
+            checkbox.setStyleSheet(f'''
+                QCheckBox::indicator {{
+                    width: 20px;
+                    height: 20px;
+                    margin: 2px;
+                }}
+                QCheckBox::indicator:unchecked {{
+                    background-color: {COLORS.BACKGROUND_WHITE};
+                    border: 2px solid {COLORS.BORDER_DARK};
+                    border-radius: 4px;
+                }}
+                QCheckBox::indicator:checked {{
+                    background-color: {COLORS.SUCCESS};
+                    border: 2px solid {COLORS.SUCCESS};
+                    border-radius: 4px;
+                }}
+            ''')
+            checkbox.stateChanged.connect(lambda state, row=row: self.on_checkbox_changed(row, state))
+            self.documents_table.setCellWidget(row, 1, checkbox)
+            
+            # رقم الوثيقة/المرفق (عمود 2)
             if source == 'attachment' and attachment_info:
                 # استخراج المعلومات من ملاحظات المرفق
                 doc_number = result_data['doc_number']
@@ -1127,9 +1235,10 @@ class MainWindow(QMainWindow):
             
             item = QTableWidgetItem(display_number)
             item.setData(Qt.ItemDataRole.UserRole, doc[0])  # احفظ معرف الوثيقة
-            self.documents_table.setItem(row, 1, item)
+            item.setTextAlignment(Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter)
+            self.documents_table.setItem(row, 2, item)
             
-            # التاريخ
+            # التاريخ (عمود 3)
             if source == 'attachment' and attachment_info:
                 # استخراج التاريخ من ملاحظات المرفق
                 import re
@@ -1137,38 +1246,50 @@ class MainWindow(QMainWindow):
                 date_val = date_match.group(1).strip() if date_match else (doc[2] or '')
             else:
                 date_val = doc[2] or ''
-            self.documents_table.setItem(row, 2, QTableWidgetItem(date_val))
+            date_item = QTableWidgetItem(date_val)
+            date_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter)
+            self.documents_table.setItem(row, 3, date_item)
             
-            # المضمون
+            # المضمون (عمود 4)
             if source == 'attachment' and attachment_info:
                 title_match = re.search(r'مضمون:\s*([^\|]+)', attachment_info)
                 title_val = title_match.group(1).strip() if title_match else (doc[3] or '')
             else:
                 title_val = doc[3] or ''
-            self.documents_table.setItem(row, 3, QTableWidgetItem(title_val))
+            content_item = QTableWidgetItem(title_val)
+            content_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            self.documents_table.setItem(row, 4, content_item)
             
-            # الجهة
+            # الجهة (عمود 5)
             if source == 'attachment' and attachment_info:
                 dept_match = re.search(r'جهة:\s*([^\|]+)', attachment_info)
                 dept_val = dept_match.group(1).strip() if dept_match else (doc[4] or '')
             else:
                 dept_val = doc[4] or ''
-            self.documents_table.setItem(row, 4, QTableWidgetItem(dept_val))
+            issuer_item = QTableWidgetItem(dept_val)
+            issuer_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            self.documents_table.setItem(row, 5, issuer_item)
             
-            # التصنيف
+            # التصنيف (عمود 6)
             if source == 'attachment' and attachment_info:
                 class_match = re.search(r'تصنيف:\s*([^\|]+)', attachment_info)
                 class_val = class_match.group(1).strip() if class_match else (doc[5] or '')
             else:
                 class_val = doc[5] or ''
-            self.documents_table.setItem(row, 5, QTableWidgetItem(class_val))
+            category_item = QTableWidgetItem(class_val)
+            category_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter)
+            self.documents_table.setItem(row, 6, category_item)
             
-            # المادة القانونية
-            self.documents_table.setItem(row, 6, QTableWidgetItem(doc[6] or ''))
+            # المادة القانونية (عمود 7)
+            legal_item = QTableWidgetItem(doc[6] or '')
+            legal_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            self.documents_table.setItem(row, 7, legal_item)
             
-            # عدد الصور
+            # عدد الصور (عمود 8)
             images = self.db.get_document_images(doc[0])
-            self.documents_table.setItem(row, 7, QTableWidgetItem(str(len(images))))
+            images_item = QTableWidgetItem(str(len(images)))
+            images_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter)
+            self.documents_table.setItem(row, 8, images_item)
             
             # Process events every 50 rows
             if idx % 50 == 0:
@@ -1178,7 +1299,7 @@ class MainWindow(QMainWindow):
         self.documents_table.setUpdatesEnabled(True)
     
     def on_checkbox_changed(self, row, state):
-        """التحكم في checkboxes - دعم التحديد المتعدد"""
+        """Handle checkbox state changes"""
         # تحديث تحديد الصف في الجدول وفقاً لحالة checkbox
         if state == Qt.CheckState.Checked.value:
             # إضافة الصف للتحديد
@@ -1186,17 +1307,17 @@ class MainWindow(QMainWindow):
         else:
             # إزالة تحديد الصف المحدد
             selection_model = self.documents_table.selectionModel()
-            index = self.documents_table.model().index(row, 0)
+            index = self.documents_table.model().index(row, 1)  # Column 1 now has checkbox
             selection_model.select(index, selection_model.SelectionFlag.Deselect | selection_model.SelectionFlag.Rows)
     
     def on_row_selection_changed(self, selected, deselected):
-        """عند تحديد صف جديد، تحديث checkbox المطابق"""
+        """Handle row selection changes"""
         # تحديث checkboxes للصفوف المحددة
         selected_rows = self.documents_table.selectionModel().selectedRows()
         
         # أولاً، امسح جميع checkboxes
         for row in range(self.documents_table.rowCount()):
-            checkbox = self.documents_table.cellWidget(row, 0)
+            checkbox = self.documents_table.cellWidget(row, 1)  # Column 1 now has checkbox
             if checkbox:
                 checkbox.blockSignals(True)
                 checkbox.setChecked(False)
@@ -1205,7 +1326,7 @@ class MainWindow(QMainWindow):
         # ثم، حدد checkboxes للصفوف المختارة
         for index in selected_rows:
             row = index.row()
-            checkbox = self.documents_table.cellWidget(row, 0)
+            checkbox = self.documents_table.cellWidget(row, 1)  # Column 1 now has checkbox
             if checkbox:
                 checkbox.blockSignals(True)
                 checkbox.setChecked(True)

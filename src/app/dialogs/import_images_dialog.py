@@ -15,7 +15,7 @@ from PyQt6.QtWidgets import (
     QFileDialog, QMessageBox
 )
 
-from ..constants import ICONS, APP_SETTINGS
+from ..constants import ICONS, APP_SETTINGS, COLORS, FONT_SIZES, DIMENSIONS
 from ..filename_parser import FilenameParser, ImageSequenceHandler
 from .utils import choose_year_folder
 
@@ -43,10 +43,43 @@ class ImportImagesDialog(QDialog):
         self.setGeometry(100, 100, 700, 500)
         self.selected_files = []
         self._init_ui()
+        self.apply_dialog_styles()
+
+    def apply_dialog_styles(self):
+        """Apply dialog-level styles to match the light theme"""
+        self.setStyleSheet(f"""
+            QDialog {{
+                background-color: {COLORS.BACKGROUND_LIGHT};
+                color: {COLORS.TEXT_PRIMARY};
+                font-size: {FONT_SIZES.BODY}px;
+                font-family: {FONT_FAMILIES.DEFAULT if 'FONT_FAMILIES' in globals() else 'Segoe UI'};
+            }}
+            QPushButton {{
+                background-color: {COLORS.ACCENT};
+                color: {COLORS.TEXT_WHITE};
+                border: 1px solid {COLORS.BORDER};
+                border-radius: {DIMENSIONS.BORDER_RADIUS_MEDIUM}px;
+                padding: {DIMENSIONS.PADDING_SMALL}px {DIMENSIONS.PADDING_MEDIUM}px;
+                min-height: {DIMENSIONS.BUTTON_HEIGHT}px;
+            }}
+            QListWidget {{
+                background-color: {COLORS.BACKGROUND_WHITE};
+                border: 1px solid {COLORS.BORDER};
+            }}
+            QTextEdit {{
+                background-color: {COLORS.BACKGROUND_WHITE};
+                border: 1px solid {COLORS.BORDER};
+            }}
+        """)
     
     def _init_ui(self):
         """إنشاء واجهة المستخدم"""
         layout = QVBoxLayout()
+        layout.setSpacing(DIMENSIONS.PADDING_MEDIUM)
+        layout.setContentsMargins(
+            DIMENSIONS.MARGIN_MEDIUM, DIMENSIONS.MARGIN_MEDIUM,
+            DIMENSIONS.MARGIN_MEDIUM, DIMENSIONS.MARGIN_MEDIUM
+        )
         
         # أزرار الاستيراد
         self._create_import_buttons(layout)
@@ -80,6 +113,7 @@ class ImportImagesDialog(QDialog):
         """إنشاء قائمة الملفات المختارة"""
         # شريط العنوان مع أزرار التحكم
         file_label_layout = QHBoxLayout()
+        file_label_layout.setSpacing(DIMENSIONS.PADDING_SMALL)
         file_label_layout.addWidget(QLabel('الملفات المختارة:'))
         file_label_layout.addStretch()
         
