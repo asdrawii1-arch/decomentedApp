@@ -40,22 +40,100 @@ class DocumentViewerWindow(QMainWindow):
         self.current_page = 0
         self.image_manager = None
         
-        print(f"\n[VIEWER] تهيئة العارض:")
-        print(f"  • معرف الوثيقة: {document_id}")
-        print(f"  • اسم الوثيقة: {document_data[1]}")
-        print(f"  • عدد الصور المتلقاة: {len(self.image_paths)}")
+        # نظام Cache للأداء السريع
+        self.image_cache = {}  # cache للصور المحملة
+        self.scaled_cache = {}  # cache للصور المُحجمة
+        self.target_width = 700  # العرض المستهدف للصور
         
-        if self.image_paths:
-            print(f"  • أول صورة: {self.image_paths[0]}")
-            print(f"  • آخر صورة: {self.image_paths[-1]}")
+        # معلومات تشخيصية محدودة
+        if len(self.image_paths) > 0:
+            pass  # تم تحميل الصور بنجاح
         
         self.setWindowTitle(f"عرض الوثيقة - {document_data[1]}")
         self.setGeometry(100, 100, 900, 700)
         self.init_ui()
         
+        # تحميل الصور مسبقاً لتحسين الأداء
+        self.preload_images()
+        
         # عرض الصورة الأولى
         if self.image_paths:
             self.display_image(0)
+    
+    def preload_images(self):
+        """تحميل الصور مسبقاً في الخلفية لتحسين الأداء"""
+        for i, image_path in enumerate(self.image_paths[:3]):  # تحميل أول 3 صور فقط لتوفير الذاكرة
+            if os.path.exists(image_path) and i not in self.image_cache:
+                try:
+                    pixmap = QPixmap(image_path)
+                    if not pixmap.isNull():
+                        self.image_cache[i] = pixmap
+                        # تحجيم الصورة وحفظها في الـ cache أيضاً
+                        scaled_pixmap = pixmap.scaledToWidth(
+                            self.target_width, 
+                            Qt.TransformationMode.SmoothTransformation
+                        )
+                        self.scaled_cache[i] = scaled_pixmap
+                except Exception:
+                    pass  # تجاهل الأخطاء في التحميل المسبق
+    
+    def get_cached_image(self, index):
+        """الحصول على صورة محجمة من الـ cache أو تحميلها"""
+        # تحقق من وجود الصورة المحجمة في الـ cache
+        if index in self.scaled_cache:
+            return self.scaled_cache[index]
+        
+        # تحقق من وجود الصورة الأصلية في الـ cache
+        if index in self.image_cache:
+            pixmap = self.image_cache[index]
+        else:
+            # تحميل الصورة من القرص
+            image_path = self.image_paths[index]
+            if not os.path.exists(image_path):
+                return None
+            
+            pixmap = QPixmap(image_path)
+            if pixmap.isNull():
+                return None
+            
+            # حفظ في الـ cache
+            self.image_cache[index] = pixmap
+        
+        # تحجيم الصورة
+        scaled_pixmap = pixmap.scaledToWidth(
+            self.target_width, 
+            Qt.TransformationMode.SmoothTransformation
+        )
+        
+        # حفظ النسخة المحجمة في الـ cache
+        self.scaled_cache[index] = scaled_pixmap
+        
+        # إدارة حجم الـ cache
+        self._manage_cache_size()
+        
+        return scaled_pixmap
+    
+    def _manage_cache_size(self):
+        """إدارة حجم الـ cache لمنع استهلاك الذاكرة المفرط"""
+        max_cache_size = 10  # أقصى عدد صور في الـ cache
+        
+        if len(self.scaled_cache) > max_cache_size:
+            # احتفظ بالصور الأقرب للصورة الحالية
+            current_index = self.current_page
+            keys_to_keep = []
+            
+            # احتفظ بالصورة الحالية والمجاورة لها
+            for i in range(max(0, current_index - 2), min(len(self.image_paths), current_index + 3)):
+                if i in self.scaled_cache:
+                    keys_to_keep.append(i)
+            
+            # احذف باقي الصور من الـ cache
+            keys_to_remove = [k for k in self.scaled_cache.keys() if k not in keys_to_keep]
+            for key in keys_to_remove[:5]:  # احذف 5 صور كحد أقصى في المرة الواحدة
+                if key in self.scaled_cache:
+                    del self.scaled_cache[key]
+                if key in self.image_cache:
+                    del self.image_cache[key]
     
     def init_ui(self):
         """إنشاء واجهة المشاهد"""
@@ -179,45 +257,59 @@ class DocumentViewerWindow(QMainWindow):
             self.display_image(0)
     
     def display_image(self, index):
-        """عرض الصورة في الموضع المحدد"""
+        """عرض الصورة في الموضع المحدد بأداء محسن"""
         if 0 <= index < len(self.image_paths):
             self.current_page = index
-            image_path = self.image_paths[index]
             
-            print(f"\n[DISPLAY] محاولة تحميل الصورة رقم {index + 1}/{len(self.image_paths)}:")
-            print(f"  • المسار: {image_path}")
-            print(f"  • موجودة؟ {os.path.exists(image_path)}")
+            # استخدام الـ cache للحصول على الصورة المحجمة
+            scaled_pixmap = self.get_cached_image(index)
             
-            # تحقق من وجود الملف
-            if not os.path.exists(image_path):
-                self.image_label.setText(f"❌ الصورة غير موجودة:\n{image_path}")
-                print(f"  ❌ ERROR: الملف غير موجود")
+            if scaled_pixmap is None:
+                # عرض رسالة خطأ إذا فشل تحميل الصورة
+                image_path = self.image_paths[index]
+                if not os.path.exists(image_path):
+                    self.image_label.setText(f"❌ الصورة غير موجودة:\n{image_path}")
+                else:
+                    self.image_label.setText(f"❌ فشل تحميل الصورة:\n{image_path}")
                 return
             
-            # حاول تحميل الصورة
-            pixmap = QPixmap(image_path)
-            
-            # تحقق من أن الصورة تم تحميلها بنجاح
-            if pixmap.isNull():
-                self.image_label.setText(f"❌ فشل تحميل الصورة:\n{image_path}\n(قد يكون الملف تالفاً)")
-                print(f"  ❌ ERROR: فشل تحميل الصورة")
-                return
-            
-            print(f"  • الحجم الأصلي: {pixmap.width()}x{pixmap.height()}")
-            
-            # تحجيم الصورة لتناسب الحجم
-            scaled_pixmap = pixmap.scaledToWidth(700, Qt.TransformationMode.SmoothTransformation)
+            # عرض الصورة المحجمة
             self.image_label.setPixmap(scaled_pixmap)
             
-            # تحديث شريط التمرير
+            # تحديث شريط التمرير بسرعة
             self.page_spin.blockSignals(True)
             self.page_spin.setValue(index + 1)
             self.page_spin.blockSignals(False)
             
-            # عرض معلومات الصورة/المرفق الحالي
+            # تحديث اختيار الصورة في القائمة بسرعة
+            self.image_list.blockSignals(True)
+            self.image_list.clearSelection()
+            if self.image_list.count() > index:
+                self.image_list.item(index).setSelected(True)
+                self.image_list.setCurrentRow(index)
+            self.image_list.blockSignals(False)
+            
+            # تحديث معلومات الصورة
             self._update_current_image_info(index)
             
-            print(f"  ✅ تم تحميل الصورة بنجاح (الحجم بعد التحجيم: {scaled_pixmap.width()}x{scaled_pixmap.height()})")
+            # تحميل الصورة التالية والسابقة في الخلفية
+            self._preload_adjacent_images(index)
+    
+    def _preload_adjacent_images(self, current_index):
+        """تحميل الصور المجاورة في الخلفية لتحسين التنقل"""
+        # تحميل الصورة التالية
+        if current_index + 1 < len(self.image_paths) and (current_index + 1) not in self.scaled_cache:
+            try:
+                self.get_cached_image(current_index + 1)
+            except Exception:
+                pass
+        
+        # تحميل الصورة السابقة
+        if current_index - 1 >= 0 and (current_index - 1) not in self.scaled_cache:
+            try:
+                self.get_cached_image(current_index - 1)
+            except Exception:
+                pass
     
     def _update_current_image_info(self, index):
         """تحديث معلومات الصورة/المرفق الحالي مع عرض معلومات الوثيقة"""
@@ -288,19 +380,13 @@ class DocumentViewerWindow(QMainWindow):
     
     def prev_page(self):
         """الصفحة السابقة"""
-        print(f"\n[BTN-PREV] نقر على زر السابق (حالياً في صفحة {self.current_page + 1})")
         if self.current_page > 0:
             self.display_image(self.current_page - 1)
-        else:
-            print("  ⚠️  أنت بالفعل في الصفحة الأولى")
     
     def next_page(self):
         """الصفحة التالية"""
-        print(f"\n[BTN-NEXT] نقر على زر التالي (حالياً في صفحة {self.current_page + 1})")
         if self.current_page < len(self.image_paths) - 1:
             self.display_image(self.current_page + 1)
-        else:
-            print(f"  ⚠️  أنت بالفعل في الصفحة الأخيرة ({len(self.image_paths)})")
     
     def go_to_page(self, page_num):
         """الذهاب إلى صفحة محددة (محاكاة on_page_changed)"""
@@ -677,4 +763,13 @@ class DocumentViewerWindow(QMainWindow):
                 print(f"[ERROR] خطأ حرج في حذف الصور: {e}")
                 import traceback
                 traceback.print_exc()
-
+    
+    def cleanup_cache(self):
+        """تنظيف الـ cache لتوفير الذاكرة"""
+        self.image_cache.clear()
+        self.scaled_cache.clear()
+    
+    def closeEvent(self, event):
+        """عند إغلاق النافذة"""
+        self.cleanup_cache()
+        super().closeEvent(event)
