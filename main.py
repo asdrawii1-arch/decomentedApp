@@ -73,6 +73,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.db = DatabaseManager('documents.db')
         self.image_manager = ImageManager('documents')
+        self.current_year = None  # السنة المختارة حالياً (None = جميع السنوات)
         self.setWindowTitle('برنامج أرشفة الكتب الرسمية')
         self.setGeometry(0, 0, 1200, 700)
         
@@ -80,6 +81,8 @@ class MainWindow(QMainWindow):
         self.setStyleSheet(MAIN_STYLESHEET)
         
         self.init_ui()
+        # تحديث قائمة السنوات قبل تحميل الوثائق
+        self.refresh_years()
         self.load_documents()
     
     def init_ui(self):
@@ -129,6 +132,65 @@ class MainWindow(QMainWindow):
         destruction_form_btn.clicked.connect(self.open_destruction_form)
         toolbar_layout.addWidget(destruction_form_btn)
         
+        # إضافة قائمة السنوات بتصميم أنيق
+        year_label = QLabel('📅 السنة:')
+        year_label.setStyleSheet("""
+            color: #2c3e50;
+            font-weight: bold;
+            font-size: 13px;
+            padding: 5px;
+        """)
+        toolbar_layout.addWidget(year_label)
+        
+        self.years_combo = QComboBox()
+        self.years_combo.setStyleSheet("""
+            QComboBox {
+                background-color: #ecf0f1;
+                border: 2px solid #bdc3c7;
+                border-radius: 8px;
+                padding: 6px 12px;
+                font-size: 12px;
+                font-weight: bold;
+                color: #2c3e50;
+                min-width: 120px;
+                max-width: 150px;
+            }
+            QComboBox:hover {
+                border-color: #3498db;
+                background-color: #e8f4fd;
+            }
+            QComboBox:focus {
+                border-color: #2980b9;
+                background-color: #d5e7f7;
+            }
+            QComboBox::drop-down {
+                subcontrol-origin: padding;
+                subcontrol-position: top right;
+                width: 25px;
+                border-left-width: 1px;
+                border-left-color: #bdc3c7;
+                border-left-style: solid;
+                border-top-right-radius: 8px;
+                border-bottom-right-radius: 8px;
+                background-color: #d5e7f7;
+            }
+            QComboBox::down-arrow {
+                image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAwAAAAGCAYAAAD37n+BAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAAdgAAAHYBTnsmCAAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAABYSURBVBiVY/z//z8DBQAggJiBEgAQQECGEQAggJiBEgAQQMyASgBAgBGNAAggZkAlACCAGFEJAAggZkQlgCCAGJEJAAggRmQCCMQmgEAcAmhgAAMAAP//A1QnWVWFLCJ8AAAAAElFTkSuQmCC);
+                width: 12px;
+                height: 6px;
+            }
+            QComboBox QAbstractItemView {
+                border: 2px solid #3498db;
+                border-radius: 6px;
+                background-color: #ffffff;
+                selection-background-color: #3498db;
+                selection-color: white;
+                padding: 4px;
+            }
+        """)
+        self.years_combo.currentTextChanged.connect(self.on_year_changed)
+        toolbar_layout.addWidget(self.years_combo)
+        
         toolbar_layout.addStretch()
         
         select_all_btn = QPushButton('✓ تحديد الكل')
@@ -148,14 +210,8 @@ class MainWindow(QMainWindow):
         toolbar_layout.addWidget(refresh_btn)
         main_layout.addLayout(toolbar_layout)
 
-        # محتوى رئيسي: قائمة السنوات على اليسار والجدول على اليمين
-        content_layout = QHBoxLayout()
-
-        # قائمة السنوات
-        self.years_list = QListWidget()
-        self.years_list.setMaximumWidth(220)
-        self.years_list.itemClicked.connect(self.on_year_selected)
-        content_layout.addWidget(self.years_list)
+        # محتوى رئيسي: جدول الوثائق بعرض كامل
+        content_layout = QVBoxLayout()
 
         # جدول الوثائق
         self.documents_table = QTableWidget()
@@ -186,17 +242,17 @@ class MainWindow(QMainWindow):
         central_widget.setLayout(main_layout)
     
     def load_documents(self, year_filter=None):
-        """تحميل قائمة الوثائق. إذا تم تمرير `year_filter` (مثل '2025')، يعرض الوثائق المرتبطة بتلك السنة فقط."""
-        # تحديث قائمة السنوات
-        self.refresh_years()
-
+        """تحميل قائمة الوثائق. يستخدم self.current_year للفلترة حسب السنة المختارة."""
         self.documents_table.setRowCount(0)
         documents = self.db.get_all_documents()
 
+        # استخدام السنة المختارة حالياً من ComboBox
+        active_year = getattr(self, 'current_year', None) or year_filter
+        
         # إذا تم تحديد سنة، احصل على معرفات الوثائق التي تحتوي صورها في مجلد تلك السنة
         filter_ids = None
-        if year_filter:
-            filter_ids = set(self.db.get_document_ids_by_image_year(year_filter))
+        if active_year:
+            filter_ids = set(self.db.get_document_ids_by_image_year(active_year))
         
         # Disable updates for better performance
         self.documents_table.setUpdatesEnabled(False)
@@ -249,26 +305,52 @@ class MainWindow(QMainWindow):
         self.documents_table.setUpdatesEnabled(True)
 
     def refresh_years(self):
-        """تحديث قائمة السنوات من مجلد `documents/`"""
+        """تحديث قائمة السنوات في قائمة اختيار أنيقة"""
         from pathlib import Path
         import os
         docs_dir = Path(self.image_manager.storage_dir)
-        self.years_list.clear()
-        # إضافة خيار عرض الكل
-        all_item = QListWidgetItem('الكل')
-        self.years_list.addItem(all_item)
+        
+        # حفظ الاختيار الحالي
+        current_selection = self.years_combo.currentText()
+        
+        # مسح قائمة اختيار السنوات
+        self.years_combo.clear()
+        
+        # إضافة خيار "جميع السنوات"
+        self.years_combo.addItem("🌐 جميع السنوات")
+        
+        # الحصول على السنوات من مجلد الوثائق
         if docs_dir.exists():
-            for d in sorted(docs_dir.iterdir()):
+            years = []
+            for d in docs_dir.iterdir():
                 if d.is_dir() and d.name.isdigit():
-                    item = QListWidgetItem(d.name)
-                    self.years_list.addItem(item)
+                    years.append(d.name)
+            
+            # ترتيب تنازلي (الأحدث أولاً)
+            for year in sorted(years, reverse=True):
+                self.years_combo.addItem(f"📅 {year}")
+        
+        # استعادة الاختيار السابق إذا أمكن
+        if current_selection:
+            index = self.years_combo.findText(current_selection)
+            if index >= 0:
+                self.years_combo.setCurrentIndex(index)
+            else:
+                self.years_combo.setCurrentIndex(0)  # جميع السنوات
 
-    def on_year_selected(self, item):
-        text = item.text()
-        if text == 'الكل':
-            self.load_documents(None)
+    def on_year_changed(self, year_text):
+        """معالج تغيير اختيار السنة من قائمة الاختيار"""
+        if not year_text:
+            return
+            
+        if "جميع السنوات" in year_text:
+            self.current_year = None  # عرض جميع السنوات
         else:
-            self.load_documents(text)
+            # استخراج رقم السنة من النص
+            self.current_year = year_text.replace("📅 ", "")
+        
+        # إعادة تحميل الوثائق
+        self.load_documents()
     
     def add_document(self):
         """إضافة وثيقة جديدة"""
