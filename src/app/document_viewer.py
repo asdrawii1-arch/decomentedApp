@@ -137,173 +137,251 @@ class DocumentViewerWindow(QMainWindow):
                     del self.image_cache[key]
     
     def init_ui(self):
-        """إنشاء واجهة المشاهد"""
+        """إنشاء واجهة المشاهد بتصميم حديث وأنيق"""
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         
-        main_layout = QVBoxLayout()
+        # التخطيط الرئيسي أفقي
+        main_layout = QHBoxLayout()
+        main_layout.setSpacing(10)
+        main_layout.setContentsMargins(10, 10, 10, 10)
         
-        # معلومات الصورة/المرفق الحالي (شريط واحد فقط)
+        # الجانب الأيسر - مستطيل معلومات الوثيقة وقائمة الصور
+        left_panel = QWidget()
+        left_panel.setStyleSheet(
+            "QWidget { "
+            "background-color: #f8f9fa; "
+            "border: 2px solid #3498db; "
+            "border-radius: 12px; "
+            "margin: 5px; }"
+        )
+        left_panel.setMaximumWidth(350)
+        left_panel.setMinimumWidth(320)
+        
+        left_layout = QVBoxLayout()
+        left_layout.setSpacing(10)
+        left_layout.setContentsMargins(15, 15, 15, 15)
+        
+        # معلومات الوثيقة في الأعلى
+        doc_info_title = QLabel('📄 معلومات الوثيقة')
+        doc_info_title.setStyleSheet(
+            "font-size: 16px; font-weight: bold; padding: 8px; "
+            "background-color: #2c3e50; color: white; border-radius: 8px; "
+            "margin-bottom: 5px; text-align: center;"
+        )
+        doc_info_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        left_layout.addWidget(doc_info_title)
+        
+        # معلومات الوثيقة التفصيلية
         self.current_image_info = QLabel()
         self.current_image_info.setStyleSheet(
-            "background-color: #2c3e50; color: white; padding: 8px; "
-            "font-size: 12px; border-radius: 8px; margin: 3px;"
-            "border: 1px solid #34495e;"
+            "QLabel { "
+            "background-color: white; color: #2c3e50; padding: 12px; "
+            "font-size: 11px; border: 1px solid #bdc3c7; border-radius: 8px; "
+            "line-height: 1.4; }"
         )
         self.current_image_info.setWordWrap(True)
-        self.current_image_info.setMinimumHeight(100)  # تصغير الارتفاع ليكون أكثر أناقة
-        main_layout.addWidget(self.current_image_info)
+        self.current_image_info.setMinimumHeight(120)
+        self.current_image_info.setMaximumHeight(150)
+        left_layout.addWidget(self.current_image_info)
         
-        # منطقة عرض الصور مع قائمة الصور
-        content_layout = QHBoxLayout()
-        
-        # قائمة الصور المحسنة على اليسار
-        image_list_layout = QVBoxLayout()
-        
-        # عنوان أنيق لقائمة الصور
-        images_title = QLabel('📁 قائمة الصور')
+        # عنوان قائمة الصور
+        images_title = QLabel('🖼️ قائمة الصور')
         images_title.setStyleSheet(
-            "font-size: 14px; font-weight: bold; padding: 8px; "
-            "background-color: #34495e; color: white; border-radius: 6px; margin-bottom: 5px;"
+            "font-size: 16px; font-weight: bold; padding: 8px; "
+            "background-color: #2c3e50; color: white; border-radius: 8px; "
+            "margin-top: 10px; margin-bottom: 5px;"
         )
         images_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        image_list_layout.addWidget(images_title)
+        left_layout.addWidget(images_title)
         
-        # أزرار التنقل في الأعلى
+        # أزرار التنقل
+        nav_container = QWidget()
+        nav_container.setStyleSheet(
+            "QWidget { background-color: white; border: 1px solid #bdc3c7; border-radius: 8px; padding: 8px; }"
+        )
+        nav_layout = QVBoxLayout()
+        nav_layout.setSpacing(8)
+        
+        # أزرار التنقل الأساسية
         nav_buttons_layout = QHBoxLayout()
         
-        prev_btn = QPushButton('◀')
-        prev_btn.clicked.connect(self.prev_page)
-        prev_btn.setEnabled(len(self.image_paths) > 1)
-        prev_btn.setStyleSheet(
-            "QPushButton { padding: 8px 12px; font-size: 16px; font-weight: bold; "
-            "background-color: #3498db; color: white; border: none; border-radius: 6px; }"
-            "QPushButton:hover { background-color: #2980b9; }"
-            "QPushButton:pressed { background-color: #21618c; }"
+        self.prev_btn = QPushButton('◀ السابق')
+        self.prev_btn.clicked.connect(self.prev_page)
+        self.prev_btn.setEnabled(len(self.image_paths) > 1)
+        self.prev_btn.setStyleSheet(
+            "QPushButton { padding: 10px 15px; font-size: 12px; font-weight: bold; "
+            "background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #3498db, stop:1 #2980b9); "
+            "color: white; border: none; border-radius: 6px; }"
+            "QPushButton:hover { background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #2980b9, stop:1 #21618c); }"
+            "QPushButton:pressed { background: #21618c; }"
             "QPushButton:disabled { background-color: #bdc3c7; color: #7f8c8d; }"
         )
-        prev_btn.setToolTip('الصورة السابقة')
-        nav_buttons_layout.addWidget(prev_btn)
+        nav_buttons_layout.addWidget(self.prev_btn)
         
-        next_btn = QPushButton('▶')
-        next_btn.clicked.connect(self.next_page)
-        next_btn.setEnabled(len(self.image_paths) > 1)
-        next_btn.setStyleSheet(
-            "QPushButton { padding: 8px 12px; font-size: 16px; font-weight: bold; "
-            "background-color: #3498db; color: white; border: none; border-radius: 6px; }"
-            "QPushButton:hover { background-color: #2980b9; }"
-            "QPushButton:pressed { background-color: #21618c; }"
+        self.next_btn = QPushButton('التالي ▶')
+        self.next_btn.clicked.connect(self.next_page)
+        self.next_btn.setEnabled(len(self.image_paths) > 1)
+        self.next_btn.setStyleSheet(
+            "QPushButton { padding: 10px 15px; font-size: 12px; font-weight: bold; "
+            "background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #3498db, stop:1 #2980b9); "
+            "color: white; border: none; border-radius: 6px; }"
+            "QPushButton:hover { background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #2980b9, stop:1 #21618c); }"
+            "QPushButton:pressed { background: #21618c; }"
             "QPushButton:disabled { background-color: #bdc3c7; color: #7f8c8d; }"
         )
-        next_btn.setToolTip('الصورة التالية')
-        nav_buttons_layout.addWidget(next_btn)
+        nav_buttons_layout.addWidget(self.next_btn)
         
-        image_list_layout.addLayout(nav_buttons_layout)
+        nav_layout.addLayout(nav_buttons_layout)
         
-        # معلومات الصفحة الحالية
+        # معلومات الصفحة
         page_info_layout = QHBoxLayout()
+        page_label = QLabel('الصورة:')
+        page_label.setStyleSheet("font-weight: bold; color: #2c3e50;")
+        
         self.page_spin = QSpinBox()
         self.page_spin.setMinimum(1)
         self.page_spin.setMaximum(len(self.image_paths) if self.image_paths else 1)
         self.page_spin.setValue(1)
         self.page_spin.valueChanged.connect(self.go_to_page)
         self.page_spin.setStyleSheet(
-            "QSpinBox { padding: 4px; border: 2px solid #3498db; border-radius: 4px; "
-            "font-weight: bold; background-color: white; }"
+            "QSpinBox { padding: 6px; border: 2px solid #3498db; border-radius: 4px; "
+            "font-weight: bold; background-color: white; font-size: 11px; }"
         )
         
         page_count_label = QLabel(f'من {len(self.image_paths)}')
-        page_count_label.setStyleSheet("font-weight: bold; color: #34495e; padding: 4px;")
+        page_count_label.setStyleSheet("font-weight: bold; color: #2c3e50;")
         
-        page_info_layout.addWidget(QLabel('الصورة:'))
+        page_info_layout.addWidget(page_label)
         page_info_layout.addWidget(self.page_spin)
         page_info_layout.addWidget(page_count_label)
-        image_list_layout.addLayout(page_info_layout)
+        page_info_layout.addStretch()
         
-        # قائمة الصور المحسنة
+        nav_layout.addLayout(page_info_layout)
+        nav_container.setLayout(nav_layout)
+        left_layout.addWidget(nav_container)
+        
+        # قائمة الصور
         self.image_list = QListWidget()
         self.image_list.setSelectionMode(QListWidget.SelectionMode.MultiSelection)
         
-        # إشارة للتنقل السريع بين الصور (تنقل فوري عند النقر)
+        # إشارة للتنقل السريع
         self.image_list.itemClicked.connect(self.on_image_clicked)
-        
-        # إشارة للوظائف الأخرى (حذف، تصدير، إلخ)
         self.image_list.itemSelectionChanged.connect(self.on_image_selected)
         
-        # تنسيق أنيق لقائمة الصور
+        # تصميم أنيق لقائمة الصور
         self.image_list.setStyleSheet(
             "QListWidget { "
-            "border: 2px solid #3498db; border-radius: 8px; "
-            "background-color: #f8f9fa; padding: 5px; }"
+            "border: 1px solid #bdc3c7; border-radius: 8px; "
+            "background-color: white; padding: 5px; }"
             "QListWidget::item { "
-            "padding: 8px; margin: 2px; border-radius: 6px; "
-            "background-color: white; border: 1px solid #e9ecef; }"
+            "padding: 10px; margin: 3px; border-radius: 6px; "
+            "background-color: #ecf0f1; border: 1px solid #d5dbdb; }"
             "QListWidget::item:selected { "
-            "background-color: #3498db; color: white; border-color: #2980b9; }"
+            "background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #3498db, stop:1 #2980b9); "
+            "color: white; border-color: #2980b9; }"
             "QListWidget::item:hover { "
-            "background-color: #ecf0f1; border-color: #3498db; }"
+            "background-color: #d6eaf8; border-color: #3498db; }"
         )
-        self.image_list.setMaximumWidth(180)  # زيادة العرض قليلاً
-        self.image_list.setMinimumHeight(300)
+        self.image_list.setMinimumHeight(200)
         
-        # إضافة الصور إلى القائمة مع تنسيق محسن
+        # إضافة الصور إلى القائمة
         for i, image_path in enumerate(self.image_paths):
-            item_text = f"📸 صورة {i+1}"
+            item_text = f"🖼️ صورة {i+1}"
             item = QListWidgetItem(item_text)
             item.setData(Qt.ItemDataRole.UserRole, i)
-            # إضافة تلميح بمسار الصورة
-            item.setToolTip(f"المسار: {image_path}")
+            item.setToolTip(f"اضغط لعرض الصورة\nالمسار: {image_path}")
             self.image_list.addItem(item)
         
-        image_list_layout.addWidget(self.image_list)
+        left_layout.addWidget(self.image_list)
         
-        content_layout.addLayout(image_list_layout, 0)
+        # أزرار الطباعة والتصدير
+        actions_layout = QHBoxLayout()
         
-        # منطقة عرض الصور الرئيسية
-        viewer_layout = QVBoxLayout()
+        print_btn = QPushButton('🖨️ طباعة')
+        print_btn.clicked.connect(self.print_images)
+        print_btn.setStyleSheet(
+            "QPushButton { padding: 8px 12px; font-size: 11px; font-weight: bold; "
+            "background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #27ae60, stop:1 #229954); "
+            "color: white; border: none; border-radius: 6px; }"
+            "QPushButton:hover { background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #229954, stop:1 #1e8449); }"
+        )
+        actions_layout.addWidget(print_btn)
         
+        export_btn = QPushButton('💾 تصدير')
+        export_btn.clicked.connect(self.export_images)
+        export_btn.setStyleSheet(
+            "QPushButton { padding: 8px 12px; font-size: 11px; font-weight: bold; "
+            "background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #e67e22, stop:1 #d35400); "
+            "color: white; border: none; border-radius: 6px; }"
+            "QPushButton:hover { background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #d35400, stop:1 #ba4a00); }"
+        )
+        actions_layout.addWidget(export_btn)
+        
+        left_layout.addLayout(actions_layout)
+        left_layout.addStretch()  # دفع المحتوى للأعلى
+        
+        left_panel.setLayout(left_layout)
+        main_layout.addWidget(left_panel)
+        
+        # الجانب الأيمن - عرض الصورة الرئيسي
+        right_panel = QWidget()
+        right_panel.setStyleSheet(
+            "QWidget { "
+            "background-color: #ffffff; "
+            "border: 2px solid #3498db; "
+            "border-radius: 12px; "
+            "margin: 5px; }"
+        )
+        
+        right_layout = QVBoxLayout()
+        right_layout.setSpacing(10)
+        right_layout.setContentsMargins(15, 15, 15, 15)
+        
+        # عنوان منطقة العرض
+        viewer_title = QLabel('📸 عرض الوثيقة')
+        viewer_title.setStyleSheet(
+            "font-size: 18px; font-weight: bold; padding: 12px; "
+            "background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #3498db, stop:1 #2980b9); "
+            "color: white; border-radius: 8px; text-align: center;"
+        )
+        viewer_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        right_layout.addWidget(viewer_title)
+        
+        # منطقة عرض الصورة
         self.image_label = QLabel()
         self.image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.image_label.setStyleSheet(f"background-color: {COLORS.BACKGROUND_WHITE}; border: 2px solid {COLORS.BORDER};")
+        self.image_label.setStyleSheet(
+            f"background-color: {COLORS.BACKGROUND_WHITE}; "
+            "border: 2px dashed #bdc3c7; border-radius: 8px; "
+            "min-height: 400px;"
+        )
         
         if not self.image_paths:
             self.image_label.setText("❌ لا توجد صور متاحة")
+            self.image_label.setStyleSheet(
+                f"background-color: {COLORS.BACKGROUND_WHITE}; "
+                "border: 2px dashed #e74c3c; border-radius: 8px; "
+                "color: #e74c3c; font-size: 16px; font-weight: bold;"
+            )
         
+        # تضمين الصورة في منطقة التمرير
         scroll_area = QScrollArea()
         scroll_area.setWidget(self.image_label)
         scroll_area.setWidgetResizable(True)
-        
-        viewer_layout.addWidget(scroll_area)
-        
-        # أزرار التصدير والطباعة في الأسفل
-        export_controls_layout = QHBoxLayout()
-        export_controls_layout.addStretch()  # لدفع الأزرار إلى اليمين
-        
-        print_btn = QPushButton('🖨️ طباعة الصور')
-        print_btn.clicked.connect(self.print_images)
-        print_btn.setStyleSheet(
-            "QPushButton { padding: 8px 16px; font-size: 12px; font-weight: bold; "
-            "background-color: #27ae60; color: white; border: none; border-radius: 6px; }"
-            "QPushButton:hover { background-color: #229954; }"
-            "QPushButton:pressed { background-color: #1e8449; }"
+        scroll_area.setStyleSheet(
+            "QScrollArea { border: none; background-color: transparent; }"
+            "QScrollBar:vertical { width: 12px; border-radius: 6px; background-color: #f1f2f6; }"
+            "QScrollBar::handle:vertical { background-color: #3498db; border-radius: 6px; }"
+            "QScrollBar::handle:vertical:hover { background-color: #2980b9; }"
         )
-        export_controls_layout.addWidget(print_btn)
         
-        export_btn = QPushButton('💾 تصدير الصور')
-        export_btn.clicked.connect(self.export_images)
-        export_btn.setStyleSheet(
-            "QPushButton { padding: 8px 16px; font-size: 12px; font-weight: bold; "
-            "background-color: #e67e22; color: white; border: none; border-radius: 6px; }"
-            "QPushButton:hover { background-color: #d35400; }"
-            "QPushButton:pressed { background-color: #ba4a00; }"
-        )
-        export_controls_layout.addWidget(export_btn)
+        right_layout.addWidget(scroll_area)
+        right_panel.setLayout(right_layout)
         
-        viewer_layout.addLayout(export_controls_layout)
-        
-        content_layout.addLayout(viewer_layout, 1)
-        
-        main_layout.addLayout(content_layout)
+        # إضافة الألواح للتخطيط الرئيسي (اليسار يأخذ مساحة ثابتة، اليمين يأخذ الباقي)
+        main_layout.addWidget(left_panel, 0)  # مساحة ثابتة
+        main_layout.addWidget(right_panel, 1)  # مساحة مرنة
         
         central_widget.setLayout(main_layout)
         
