@@ -55,7 +55,7 @@ class DocumentViewerWindow(QMainWindow):
             pass  # تم تحميل الصور بنجاح
         
         self.setWindowTitle(f"عرض الوثيقة - {document_data[1]}")
-        self.setGeometry(100, 100, 900, 700)
+        self.setGeometry(50, 50, 1400, 900)  # حجم محسن للتصميم الجديد بثلاثة أجزاء
         self.init_ui()
         
         # تحميل الصور مسبقاً لتحسين الأداء
@@ -326,125 +326,61 @@ class DocumentViewerWindow(QMainWindow):
         left_layout.addStretch()  # دفع المحتوى للأعلى
         
         left_panel.setLayout(left_layout)
-        main_layout.addWidget(left_panel)
         
-        # الجانب الأيمن - عرض الصورة الرئيسي
-        right_panel = QWidget()
-        right_panel.setStyleSheet(
+        # المنطقة الوسطى - عرض الصورة الرئيسي
+        center_panel = QWidget()
+        center_panel.setStyleSheet(
             "QWidget { "
             "background-color: #ffffff; "
             "border: 2px solid #3498db; "
             "border-radius: 12px; "
             "margin: 2px; }"
         )
-        right_panel.setMinimumWidth(400)  # حد أدنى لضمان استخدام جيد للمساحة
+        center_panel.setMinimumWidth(500)  # مساحة أكبر لعرض الصور
         
-        right_layout = QVBoxLayout()
-        right_layout.setSpacing(5)  # تقليل المسافة
-        right_layout.setContentsMargins(10, 10, 10, 10)  # تقليل الهوامش
+        center_layout = QVBoxLayout()
+        center_layout.setSpacing(3)
+        center_layout.setContentsMargins(8, 8, 8, 8)
         
         # عنوان منطقة العرض
         viewer_title = QLabel('📸 عرض الوثيقة')
         viewer_title.setStyleSheet(
-            "font-size: 18px; font-weight: bold; padding: 12px; "
+            "font-size: 16px; font-weight: bold; padding: 8px; "
             "background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #3498db, stop:1 #2980b9); "
-            "color: white; border-radius: 8px; text-align: center;"
+            "color: white; border-radius: 6px; text-align: center;"
         )
         viewer_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        right_layout.addWidget(viewer_title)
+        viewer_title.setMaximumHeight(40)
+        center_layout.addWidget(viewer_title)
         
-        # شريط أدوات التكبير والتصغير
-        zoom_toolbar = QWidget()
-        zoom_toolbar.setStyleSheet(
-            "QWidget { background-color: #ecf0f1; border: 1px solid #bdc3c7; border-radius: 6px; padding: 5px; }"
-        )
-        zoom_layout = QHBoxLayout()
-        zoom_layout.setSpacing(8)
-        
-        # زر التصغير
-        zoom_out_btn = QPushButton('🔍-')
-        zoom_out_btn.clicked.connect(self.zoom_out)
-        zoom_out_btn.setStyleSheet(
-            "QPushButton { padding: 8px 12px; font-size: 14px; font-weight: bold; "
-            "background-color: #e74c3c; color: white; border: none; border-radius: 4px; }"
-            "QPushButton:hover { background-color: #c0392b; }"
-        )
-        zoom_out_btn.setToolTip('تصغير الصورة')
-        zoom_layout.addWidget(zoom_out_btn)
-        
-        # مؤشر نسبة التكبير
-        self.zoom_label = QLabel('100%')
-        self.zoom_label.setStyleSheet(
-            "font-weight: bold; color: #2c3e50; padding: 5px; min-width: 50px;"
-        )
-        self.zoom_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        zoom_layout.addWidget(self.zoom_label)
-        
-        # زر التكبير
-        zoom_in_btn = QPushButton('🔍+')
-        zoom_in_btn.clicked.connect(self.zoom_in)
-        zoom_in_btn.setStyleSheet(
-            "QPushButton { padding: 8px 12px; font-size: 14px; font-weight: bold; "
-            "background-color: #27ae60; color: white; border: none; border-radius: 4px; }"
-            "QPushButton:hover { background-color: #229954; }"
-        )
-        zoom_in_btn.setToolTip('تكبير الصورة')
-        zoom_layout.addWidget(zoom_in_btn)
-        
-        zoom_layout.addStretch()
-        
-        # زر ملء الشاشة
-        fit_window_btn = QPushButton('📐 ملء النافذة')
-        fit_window_btn.clicked.connect(self.fit_to_window)
-        fit_window_btn.setStyleSheet(
-            "QPushButton { padding: 8px 12px; font-size: 11px; font-weight: bold; "
-            "background-color: #3498db; color: white; border: none; border-radius: 4px; }"
-            "QPushButton:hover { background-color: #2980b9; }"
-        )
-        fit_window_btn.setToolTip('ملء النافذة')
-        zoom_layout.addWidget(fit_window_btn)
-        
-        # زر الحجم الأصلي
-        actual_size_btn = QPushButton('📏 الحجم الأصلي')
-        actual_size_btn.clicked.connect(self.actual_size)
-        actual_size_btn.setStyleSheet(
-            "QPushButton { padding: 8px 12px; font-size: 11px; font-weight: bold; "
-            "background-color: #9b59b6; color: white; border: none; border-radius: 4px; }"
-            "QPushButton:hover { background-color: #8e44ad; }"
-        )
-        actual_size_btn.setToolTip('الحجم الأصلي 100%')
-        zoom_layout.addWidget(actual_size_btn)
-        
-        zoom_toolbar.setLayout(zoom_layout)
-        right_layout.addWidget(zoom_toolbar)
-        
-        # منطقة عرض الصورة مع تحسين استخدام المساحة
+        # منطقة عرض الصورة مع تحسين المساحة الطولية
         self.image_label = QLabel()
         self.image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.image_label.setStyleSheet(
             f"background-color: {COLORS.BACKGROUND_WHITE}; "
-            "border: 1px solid #bdc3c7; border-radius: 8px; "
-            "min-height: 300px;"
+            "border: 1px solid #bdc3c7; border-radius: 6px;"
         )
-        self.image_label.setScaledContents(False)  # للتحكم في تحجيم الصورة يدوياً
+        self.image_label.setScaledContents(False)
         
         if not self.image_paths:
             self.image_label.setText("❌ لا توجد صور متاحة")
             self.image_label.setStyleSheet(
                 f"background-color: {COLORS.BACKGROUND_WHITE}; "
-                "border: 2px dashed #e74c3c; border-radius: 8px; "
+                "border: 2px dashed #e74c3c; border-radius: 6px; "
                 "color: #e74c3c; font-size: 16px; font-weight: bold;"
             )
         
-        # تضمين الصورة في منطقة التمرير مع تحسين المساحة
+        # منطقة التمرير مع تحكم محسن
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidget(self.image_label)
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.scroll_area.setSizePolicy(
-            QSizePolicy.Policy.Expanding, 
+            QSizePolicy.Policy.Expanding,
             QSizePolicy.Policy.Expanding
         )
+        self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.scroll_area.setStyleSheet(
             "QScrollArea { border: none; background-color: transparent; }"
             "QScrollBar:vertical { width: 12px; border-radius: 6px; background-color: #f1f2f6; }"
@@ -455,12 +391,109 @@ class DocumentViewerWindow(QMainWindow):
             "QScrollBar::handle:horizontal:hover { background-color: #2980b9; }"
         )
         
-        right_layout.addWidget(self.scroll_area)
+        center_layout.addWidget(self.scroll_area)
+        center_panel.setLayout(center_layout)
+        
+        # الجانب الأيمن - أدوات التحكم في التكبير عمودياً
+        right_panel = QWidget()
+        right_panel.setStyleSheet(
+            "QWidget { "
+            "background-color: #f8f9fa; "
+            "border: 2px solid #3498db; "
+            "border-radius: 12px; "
+            "margin: 2px; }"
+        )
+        right_panel.setFixedWidth(120)  # عرض ثابت للوحة التحكم
+        
+        right_layout = QVBoxLayout()
+        right_layout.setSpacing(8)
+        right_layout.setContentsMargins(10, 10, 10, 10)
+        
+        # عنوان لوحة التحكم
+        control_title = QLabel('🎛️ التحكم')
+        control_title.setStyleSheet(
+            "font-size: 14px; font-weight: bold; padding: 6px; "
+            "background-color: #2c3e50; color: white; border-radius: 6px; "
+            "text-align: center;"
+        )
+        control_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        right_layout.addWidget(control_title)
+        
+        # مؤشر نسبة التكبير
+        self.zoom_label = QLabel('100%')
+        self.zoom_label.setStyleSheet(
+            "font-weight: bold; color: #2c3e50; padding: 8px; "
+            "background-color: white; border: 1px solid #bdc3c7; border-radius: 4px; "
+            "text-align: center; font-size: 12px;"
+        )
+        self.zoom_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        right_layout.addWidget(self.zoom_label)
+        
+        # زر التكبير
+        zoom_in_btn = QPushButton('🔍+')
+        zoom_in_btn.clicked.connect(self.zoom_in)
+        zoom_in_btn.setStyleSheet(
+            "QPushButton { padding: 12px; font-size: 14px; font-weight: bold; "
+            "background-color: #27ae60; color: white; border: none; border-radius: 6px; }"
+            "QPushButton:hover { background-color: #229954; }"
+            "QPushButton:pressed { background-color: #1e8449; }"
+        )
+        zoom_in_btn.setToolTip('تكبير الصورة')
+        zoom_in_btn.setMinimumHeight(45)
+        right_layout.addWidget(zoom_in_btn)
+        
+        # زر التصغير
+        zoom_out_btn = QPushButton('🔍-')
+        zoom_out_btn.clicked.connect(self.zoom_out)
+        zoom_out_btn.setStyleSheet(
+            "QPushButton { padding: 12px; font-size: 14px; font-weight: bold; "
+            "background-color: #e74c3c; color: white; border: none; border-radius: 6px; }"
+            "QPushButton:hover { background-color: #c0392b; }"
+            "QPushButton:pressed { background-color: #a93226; }"
+        )
+        zoom_out_btn.setToolTip('تصغير الصورة')
+        zoom_out_btn.setMinimumHeight(45)
+        right_layout.addWidget(zoom_out_btn)
+        
+        # فاصل بصري
+        separator = QLabel()
+        separator.setStyleSheet("background-color: #bdc3c7; margin: 5px 20px;")
+        separator.setFixedHeight(1)
+        right_layout.addWidget(separator)
+        
+        # زر ملء النافذة
+        fit_window_btn = QPushButton('📐')
+        fit_window_btn.clicked.connect(self.fit_to_window)
+        fit_window_btn.setStyleSheet(
+            "QPushButton { padding: 10px; font-size: 16px; font-weight: bold; "
+            "background-color: #3498db; color: white; border: none; border-radius: 6px; }"
+            "QPushButton:hover { background-color: #2980b9; }"
+            "QPushButton:pressed { background-color: #21618c; }"
+        )
+        fit_window_btn.setToolTip('ملء النافذة')
+        fit_window_btn.setMinimumHeight(40)
+        right_layout.addWidget(fit_window_btn)
+        
+        # زر الحجم الأصلي
+        actual_size_btn = QPushButton('📏')
+        actual_size_btn.clicked.connect(self.actual_size)
+        actual_size_btn.setStyleSheet(
+            "QPushButton { padding: 10px; font-size: 16px; font-weight: bold; "
+            "background-color: #9b59b6; color: white; border: none; border-radius: 6px; }"
+            "QPushButton:hover { background-color: #8e44ad; }"
+            "QPushButton:pressed { background-color: #7d3c98; }"
+        )
+        actual_size_btn.setToolTip('الحجم الأصلي 100%')
+        actual_size_btn.setMinimumHeight(40)
+        right_layout.addWidget(actual_size_btn)
+        
+        right_layout.addStretch()  # دفع الأزرار للأعلى
         right_panel.setLayout(right_layout)
         
-        # توزيع محسن للمساحة - اليسار 30% واليمين 70%
-        main_layout.addWidget(left_panel, 3)  # 30% من المساحة
-        main_layout.addWidget(right_panel, 7)  # 70% من المساحة
+        # توزيع محسن للمساحة - اليسار 25%، الوسط 65%، اليمين 10%
+        main_layout.addWidget(left_panel, 25)   # 25% للمعلومات والقوائم
+        main_layout.addWidget(center_panel, 65) # 65% لعرض الصورة
+        main_layout.addWidget(right_panel, 10)  # 10% لأدوات التحكم
         
         central_widget.setLayout(main_layout)
         
