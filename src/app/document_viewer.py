@@ -157,10 +157,70 @@ class DocumentViewerWindow(QMainWindow):
         # منطقة عرض الصور مع قائمة الصور
         content_layout = QHBoxLayout()
         
-        # قائمة الصور على اليسار
+        # قائمة الصور المحسنة على اليسار
         image_list_layout = QVBoxLayout()
-        image_list_layout.addWidget(QLabel('<b>قائمة الصور:</b>'))
         
+        # عنوان أنيق لقائمة الصور
+        images_title = QLabel('📁 قائمة الصور')
+        images_title.setStyleSheet(
+            "font-size: 14px; font-weight: bold; padding: 8px; "
+            "background-color: #34495e; color: white; border-radius: 6px; margin-bottom: 5px;"
+        )
+        images_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        image_list_layout.addWidget(images_title)
+        
+        # أزرار التنقل في الأعلى
+        nav_buttons_layout = QHBoxLayout()
+        
+        prev_btn = QPushButton('◀')
+        prev_btn.clicked.connect(self.prev_page)
+        prev_btn.setEnabled(len(self.image_paths) > 1)
+        prev_btn.setStyleSheet(
+            "QPushButton { padding: 8px 12px; font-size: 16px; font-weight: bold; "
+            "background-color: #3498db; color: white; border: none; border-radius: 6px; }"
+            "QPushButton:hover { background-color: #2980b9; }"
+            "QPushButton:pressed { background-color: #21618c; }"
+            "QPushButton:disabled { background-color: #bdc3c7; color: #7f8c8d; }"
+        )
+        prev_btn.setToolTip('الصورة السابقة')
+        nav_buttons_layout.addWidget(prev_btn)
+        
+        next_btn = QPushButton('▶')
+        next_btn.clicked.connect(self.next_page)
+        next_btn.setEnabled(len(self.image_paths) > 1)
+        next_btn.setStyleSheet(
+            "QPushButton { padding: 8px 12px; font-size: 16px; font-weight: bold; "
+            "background-color: #3498db; color: white; border: none; border-radius: 6px; }"
+            "QPushButton:hover { background-color: #2980b9; }"
+            "QPushButton:pressed { background-color: #21618c; }"
+            "QPushButton:disabled { background-color: #bdc3c7; color: #7f8c8d; }"
+        )
+        next_btn.setToolTip('الصورة التالية')
+        nav_buttons_layout.addWidget(next_btn)
+        
+        image_list_layout.addLayout(nav_buttons_layout)
+        
+        # معلومات الصفحة الحالية
+        page_info_layout = QHBoxLayout()
+        self.page_spin = QSpinBox()
+        self.page_spin.setMinimum(1)
+        self.page_spin.setMaximum(len(self.image_paths) if self.image_paths else 1)
+        self.page_spin.setValue(1)
+        self.page_spin.valueChanged.connect(self.go_to_page)
+        self.page_spin.setStyleSheet(
+            "QSpinBox { padding: 4px; border: 2px solid #3498db; border-radius: 4px; "
+            "font-weight: bold; background-color: white; }"
+        )
+        
+        page_count_label = QLabel(f'من {len(self.image_paths)}')
+        page_count_label.setStyleSheet("font-weight: bold; color: #34495e; padding: 4px;")
+        
+        page_info_layout.addWidget(QLabel('الصورة:'))
+        page_info_layout.addWidget(self.page_spin)
+        page_info_layout.addWidget(page_count_label)
+        image_list_layout.addLayout(page_info_layout)
+        
+        # قائمة الصور المحسنة
         self.image_list = QListWidget()
         self.image_list.setSelectionMode(QListWidget.SelectionMode.MultiSelection)
         
@@ -170,12 +230,29 @@ class DocumentViewerWindow(QMainWindow):
         # إشارة للوظائف الأخرى (حذف، تصدير، إلخ)
         self.image_list.itemSelectionChanged.connect(self.on_image_selected)
         
-        self.image_list.setMaximumWidth(150)
+        # تنسيق أنيق لقائمة الصور
+        self.image_list.setStyleSheet(
+            "QListWidget { "
+            "border: 2px solid #3498db; border-radius: 8px; "
+            "background-color: #f8f9fa; padding: 5px; }"
+            "QListWidget::item { "
+            "padding: 8px; margin: 2px; border-radius: 6px; "
+            "background-color: white; border: 1px solid #e9ecef; }"
+            "QListWidget::item:selected { "
+            "background-color: #3498db; color: white; border-color: #2980b9; }"
+            "QListWidget::item:hover { "
+            "background-color: #ecf0f1; border-color: #3498db; }"
+        )
+        self.image_list.setMaximumWidth(180)  # زيادة العرض قليلاً
+        self.image_list.setMinimumHeight(300)
         
-        # إضافة الصور إلى القائمة
+        # إضافة الصور إلى القائمة مع تنسيق محسن
         for i, image_path in enumerate(self.image_paths):
-            item = QListWidgetItem(f"صورة {i+1}")
+            item_text = f"📸 صورة {i+1}"
+            item = QListWidgetItem(item_text)
             item.setData(Qt.ItemDataRole.UserRole, i)
+            # إضافة تلميح بمسار الصورة
+            item.setToolTip(f"المسار: {image_path}")
             self.image_list.addItem(item)
         
         image_list_layout.addWidget(self.image_list)
@@ -198,41 +275,31 @@ class DocumentViewerWindow(QMainWindow):
         
         viewer_layout.addWidget(scroll_area)
         
-        # أزرار التحكم
-        control_layout = QHBoxLayout()
+        # أزرار التصدير والطباعة في الأسفل
+        export_controls_layout = QHBoxLayout()
+        export_controls_layout.addStretch()  # لدفع الأزرار إلى اليمين
         
-        prev_btn = QPushButton('⬅️ السابق')
-        prev_btn.clicked.connect(self.prev_page)
-        prev_btn.setEnabled(len(self.image_paths) > 1)
-        control_layout.addWidget(prev_btn)
-        
-        self.page_spin = QSpinBox()
-        self.page_spin.setMinimum(1)
-        self.page_spin.setMaximum(len(self.image_paths) if self.image_paths else 1)
-        self.page_spin.setValue(1)
-        self.page_spin.valueChanged.connect(self.go_to_page)
-        control_layout.addWidget(QLabel('الصفحة:'))
-        control_layout.addWidget(self.page_spin)
-        
-        page_count_label = QLabel(f'من {len(self.image_paths)}')
-        control_layout.addWidget(page_count_label)
-        
-        next_btn = QPushButton('التالي ➡️')
-        next_btn.clicked.connect(self.next_page)
-        next_btn.setEnabled(len(self.image_paths) > 1)
-        control_layout.addWidget(next_btn)
-        
-        control_layout.addStretch()
-        
-        print_btn = QPushButton('🖨️ طباعة')
+        print_btn = QPushButton('🖨️ طباعة الصور')
         print_btn.clicked.connect(self.print_images)
-        control_layout.addWidget(print_btn)
+        print_btn.setStyleSheet(
+            "QPushButton { padding: 8px 16px; font-size: 12px; font-weight: bold; "
+            "background-color: #27ae60; color: white; border: none; border-radius: 6px; }"
+            "QPushButton:hover { background-color: #229954; }"
+            "QPushButton:pressed { background-color: #1e8449; }"
+        )
+        export_controls_layout.addWidget(print_btn)
         
-        export_btn = QPushButton('💾 تصدير')
+        export_btn = QPushButton('💾 تصدير الصور')
         export_btn.clicked.connect(self.export_images)
-        control_layout.addWidget(export_btn)
+        export_btn.setStyleSheet(
+            "QPushButton { padding: 8px 16px; font-size: 12px; font-weight: bold; "
+            "background-color: #e67e22; color: white; border: none; border-radius: 6px; }"
+            "QPushButton:hover { background-color: #d35400; }"
+            "QPushButton:pressed { background-color: #ba4a00; }"
+        )
+        export_controls_layout.addWidget(export_btn)
         
-        viewer_layout.addLayout(control_layout)
+        viewer_layout.addLayout(export_controls_layout)
         
         content_layout.addLayout(viewer_layout, 1)
         
