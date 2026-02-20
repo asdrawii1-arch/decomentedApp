@@ -531,18 +531,18 @@ class DocumentViewerWindow(QMainWindow):
                 )
                 return
             
-            # إعادة تعيين التكبير وعرض الصورة بحجم مناسب للنافذة
+            # إعادة تعيين التكبير وعرض الصورة بحجم مناسب for the new longitudinal design
             self.zoom_factor = 1.0
             
-            # حساب الحجم المناسب للعرض الأولي
+            # حساب الحجم المناسب للعرض الأولي مع الاستفادة من المساحة الطولية الكبيرة
             available_size = self.scroll_area.viewport().size()
-            if available_size.width() > 100 and available_size.height() > 100:
-                # حساب نسبة مبدئية للتكبير بحيث تملأ النافذة بشكل مناسب
-                scale_x = (available_size.width() - 40) / self.original_pixmap.width()
-                scale_y = (available_size.height() - 100) / self.original_pixmap.height()
-                initial_scale = min(scale_x, scale_y, 1.0)  # لا تكبر أكثر من الحجم الأصلي ولكن قد تصغر
+            if available_size.width() > 200 and available_size.height() > 200:
+                # حساب نسبة محسنة للتكبير للاستفادة من التصميم الطولي
+                scale_x = (available_size.width() - 30) / self.original_pixmap.width()
+                scale_y = (available_size.height() - 80) / self.original_pixmap.height()
+                initial_scale = min(scale_x, scale_y, 1.5)  # السماح بالتكبير حتى 150% للاستفادة من المساحة
                 
-                if initial_scale > 0.1:  # تجنب التصغير المفرط
+                if initial_scale > 0.2:  # تجنب التصغير المفرط
                     self.zoom_factor = initial_scale
             
             self.apply_zoom()
@@ -587,40 +587,40 @@ class DocumentViewerWindow(QMainWindow):
         self.next_btn.setEnabled(index < len(self.image_paths) - 1)
     
     def zoom_in(self):
-        """تكبير الصورة"""
+        """تكبير الصورة مع حد أقصى محسن للتصميم الطولي"""
         if self.original_pixmap:
-            self.zoom_factor = min(self.zoom_factor * 1.25, 5.0)  # حد أقصى 500%
+            self.zoom_factor = min(self.zoom_factor * 1.25, 8.0)  # حد أقصى 800% للاستفادة من المساحة الكبيرة
             self.apply_zoom()
     
     def zoom_out(self):
-        """تصغير الصورة"""
+        """تصغير الصورة مع حد أدنى محسن"""
         if self.original_pixmap:
-            self.zoom_factor = max(self.zoom_factor / 1.25, 0.1)  # حد أدنى 10%
+            self.zoom_factor = max(self.zoom_factor / 1.25, 0.05)  # حد أدنى 5%
             self.apply_zoom()
     
     def fit_to_window(self):
-        """ملء النافذة بالصورة مع حساب أفضل للمساحة المتاحة"""
+        """ملء النافذة بالصورة مع حساب أفضل للمساحة المتاحة - محسن للتصميم الطولي"""
         if self.original_pixmap:
-            # حساب المساحة المتاحة الفعلية مع مراعاة شريط الأدوات
+            # حساب المساحة المتاحة الفعلية في المنطقة الوسطى
             available_size = self.scroll_area.viewport().size()
             
-            # طرح مساحة شريط الأدوات والهوامش
-            toolbar_height = 60  # تقدير ارتفاع شريط الأدوات
-            margins = 40  # هوامش إضافية
+            # طرح مساحة العنوان والهوامش المحسنة للتصميم الجديد
+            toolbar_height = 45  # ارتفاع شريط العنوان المحسن
+            margins = 20  # هوامش أقل للاستفادة القصوى من المساحة
             
             available_size.setWidth(available_size.width() - margins)
             available_size.setHeight(available_size.height() - toolbar_height - margins)
             
             # التأكد من أن المساحة المتاحة صالحة
             if available_size.width() <= 0 or available_size.height() <= 0:
-                # استخدام قيم افتراضية محسنة
-                available_size.setWidth(700)
-                available_size.setHeight(500)
+                # استخدام قيم افتراضية محسنة للتصميم الطولي
+                available_size.setWidth(800)
+                available_size.setHeight(600)
             
-            # حساب نسبة التكبير لملء النافذة
+            # حساب نسبة التكبير للاستفادة من المساحة الطولية
             scale_x = available_size.width() / self.original_pixmap.width()
             scale_y = available_size.height() / self.original_pixmap.height()
-            self.zoom_factor = min(scale_x, scale_y, 2.0)  # حد أقصى 200%
+            self.zoom_factor = min(scale_x, scale_y, 3.0)  # حد أقصى 300% للاستفادة من المساحة الكبيرة
             
             self.apply_zoom()
     
