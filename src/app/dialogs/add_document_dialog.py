@@ -8,6 +8,7 @@ Add Document Dialog
 import os
 import tempfile
 import shutil
+import json
 from datetime import datetime
 from pathlib import Path
 
@@ -64,20 +65,27 @@ class AddDocumentDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle('📄 إضافة وثيقة جديدة')
         
-        # تعيين حجم النافذة مناسب ومتناسق في الجهة اليمنى العلوية
-        if parent:
-            # حجم مناسب في الجهة اليمنى العلوية من النافذة الأب
-            parent_geom = parent.geometry()
-            dialog_width = 980
-            dialog_height = 650
-            dialog_x = parent_geom.x() + parent_geom.width() - dialog_width - 20
-            dialog_y = parent_geom.y() + 30
-            self.setGeometry(dialog_x, dialog_y, dialog_width, dialog_height)
-        else:
-            # حجم افتراضي مناسب في الجهة اليمنى العلوية
-            self.setGeometry(300, 50, 980, 650)
+        # تعيين النافذة على كامل الشاشة مع هوامش صغيرة
+        from PyQt6.QtWidgets import QApplication
+        screen = QApplication.primaryScreen()
+        screen_geometry = screen.geometry()
         
-        self.setMinimumSize(880, 580)
+        # حساب حجم النافذة (92% من الشاشة مع هوامش منتظمة)
+        margin = 60
+        dialog_width = screen_geometry.width() - (margin * 2)
+        dialog_height = screen_geometry.height() - (margin * 2)
+        dialog_x = screen_geometry.x() + margin
+        dialog_y = screen_geometry.y() + margin
+        
+        self.setGeometry(dialog_x, dialog_y, dialog_width, dialog_height)
+        self.setMinimumSize(900, 600)
+        self.setMaximumSize(screen_geometry.width(), screen_geometry.height())
+        
+        # تحسين مظهر النافذة
+        self.setWindowState(Qt.WindowState.WindowNoState)  # التأكد من عدم تصغير النافذة
+        
+        # جعل النافذة قابلة لتغيير الحجم بسهولة
+        self.resize(dialog_width, dialog_height)
         
         self.db = db
         self.image_manager = image_manager
@@ -270,6 +278,43 @@ class AddDocumentDialog(QDialog):
                     stop: 1 {COLORS.WARNING});
             }}
             
+            /* أزرار إدارة جهات الإصدار */
+            QPushButton[class="dept-add-btn"] {{
+                background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                    stop: 0 #10b981,
+                    stop: 1 {COLORS.SUCCESS});
+                border: 1px solid {COLORS.SUCCESS};
+                border-radius: 8px;
+                font-size: 16px;
+                font-weight: bold;
+                color: white;
+                padding: 4px;
+            }}
+            
+            QPushButton[class="dept-add-btn"]:hover {{
+                background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                    stop: 0 #059669,
+                    stop: 1 #047857);
+            }}
+            
+            QPushButton[class="dept-remove-btn"] {{
+                background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                    stop: 0 #f87171,
+                    stop: 1 {COLORS.ERROR});
+                border: 1px solid {COLORS.ERROR};
+                border-radius: 8px;
+                font-size: 14px;
+                font-weight: bold;
+                color: white;
+                padding: 4px;
+            }}
+            
+            QPushButton[class="dept-remove-btn"]:hover {{
+                background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                    stop: 0 #dc2626,
+                    stop: 1 #b91c1c);
+            }}
+            
             /* Enhanced SpinBox */
             QSpinBox {{
                 background-color: {COLORS.BACKGROUND_WHITE};
@@ -420,10 +465,39 @@ class AddDocumentDialog(QDialog):
         self.doc_title.setPlaceholderText("موضوع الوثيقة...")
         group_layout.addRow('📄 المضمون:', self.doc_title)
         
-        # جهة الإصدار
+        # جهة الإصدار مع إمكانية التحرير
+        # يمكن للمستخدم الكتابة مباشرة أو اختيار من القائمة
+        # زر ➕ لإضافة جهة جديدة للقائمة  
+        # زر 🗑️ لحذف الجهة المحددة (عدا الأساسية)
+        dept_widget = QWidget()
+        dept_layout = QHBoxLayout(dept_widget)
+        dept_layout.setContentsMargins(0, 0, 0, 0)
+        dept_layout.setSpacing(8)
+        
         self.issuing_dept = QComboBox()
-        self.issuing_dept.addItems(APP_SETTINGS.DEFAULT_DEPARTMENTS)
-        group_layout.addRow('🏢 جهة الإصدار:', self.issuing_dept)
+        self.issuing_dept.setEditable(True)  # تمكين التحرير
+        self.issuing_dept.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)  # منع الإدراج التلقائي
+        self.issuing_dept.lineEdit().setPlaceholderText("اختر أو اكتب جهة الإصدار...")
+        self._load_departments()
+        dept_layout.addWidget(self.issuing_dept)
+        
+        # زر إضافة جهة جديدة
+        add_dept_btn = QPushButton('➕')
+        add_dept_btn.setFixedSize(35, 35)
+        add_dept_btn.setProperty("class", "dept-add-btn")
+        add_dept_btn.setToolTip('إضافة جهة إصدار جديدة')
+        add_dept_btn.clicked.connect(self._add_department)
+        dept_layout.addWidget(add_dept_btn)
+        
+        # زر حذف الجهة المحددة
+        remove_dept_btn = QPushButton('🗑️')
+        remove_dept_btn.setFixedSize(35, 35)
+        remove_dept_btn.setProperty("class", "dept-remove-btn")
+        remove_dept_btn.setToolTip('حذف الجهة المحددة')
+        remove_dept_btn.clicked.connect(self._remove_department)
+        dept_layout.addWidget(remove_dept_btn)
+        
+        group_layout.addRow('🏢 جهة الإصدار:', dept_widget)
         
         # التصنيف في صف منفصل
         self.doc_classification = QLineEdit()
@@ -1319,6 +1393,124 @@ class AddDocumentDialog(QDialog):
             
         except Exception as e:
             QMessageBox.critical(self, 'خطأ', f'خطأ في الحفظ: {str(e)}')
+    
+    # =========================================================================
+    # وظائف إدارة جهات الإصدار
+    # =========================================================================
+    
+    def _load_departments(self):
+        """تحميل قائمة جهات الإصدار المخصصة"""
+        # تحميل الجهات الافتراضية
+        departments = APP_SETTINGS.DEFAULT_DEPARTMENTS.copy()
+        
+        # تحميل الجهات المخصصة من ملف الإعدادات
+        try:
+            settings_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../settings.json')
+            if os.path.exists(settings_file):
+                with open(settings_file, 'r', encoding='utf-8') as f:
+                    settings = json.load(f)
+                    custom_departments = settings.get('custom_departments', [])
+                    # إضافة الجهات المخصصة (تجنب التكرار)
+                    for dept in custom_departments:
+                        if dept not in departments:
+                            departments.append(dept)
+        except Exception as e:
+            print(f"[INFO] خطأ في تحميل الجهات المخصصة: {e}")
+        
+        self.issuing_dept.clear()
+        self.issuing_dept.addItems(departments)
+    
+    def _add_department(self):
+        """إضافة جهة إصدار جديدة"""
+        current_text = self.issuing_dept.currentText().strip()
+        
+        # التحقق من عدم وجود النص في القائمة
+        existing_items = [self.issuing_dept.itemText(i) for i in range(self.issuing_dept.count())]
+        
+        if not current_text:
+            QMessageBox.warning(self, 'تنبيه', 'يرجى كتابة اسم الجهة أولاً')
+            return
+        
+        if current_text == 'اختر جهة الإصدار':
+            QMessageBox.warning(self, 'تنبيه', 'لا يمكن إضافة هذا النص كجهة إصدار')
+            return
+        
+        if current_text in existing_items:
+            QMessageBox.information(self, 'موجود بالفعل', 'هذه الجهة موجودة بالفعل في القائمة')
+            return
+        
+        # إضافة الجهة الجديدة للقائمة
+        self.issuing_dept.addItem(current_text)
+        self.issuing_dept.setCurrentText(current_text)
+        
+        # حفظ الإعدادات
+        self._save_departments()
+        
+        QMessageBox.information(self, 'نجح ✅', f'تم إضافة الجهة:\n{current_text}')
+    
+    def _remove_department(self):
+        """حذف الجهة المحددة"""
+        current_text = self.issuing_dept.currentText().strip()
+        current_index = self.issuing_dept.currentIndex()
+        
+        # التحقق من أنها ليست من الجهات الأساسية
+        if current_text in APP_SETTINGS.DEFAULT_DEPARTMENTS:
+            QMessageBox.warning(self, 'لا يمكن الحذف', 'لا يمكن حذف الجهات الأساسية')
+            return
+        
+        if not current_text or current_index < 0:
+            QMessageBox.warning(self, 'تنبيه', 'يرجى اختيار جهة للحذف')
+            return
+        
+        # تأكيد الحذف
+        reply = QMessageBox.question(
+            self, 'تأكيد الحذف',
+            f'هل أنت متأكد من حذف الجهة:\n{current_text}؟',
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        
+        if reply == QMessageBox.StandardButton.Yes:
+            self.issuing_dept.removeItem(current_index)
+            
+            # حفظ الإعدادات
+            self._save_departments()
+            
+            QMessageBox.information(self, 'تم الحذف ✅', f'تم حذف الجهة:\n{current_text}')
+    
+    def _save_departments(self):
+        """حفظ قائمة الجهات المخصصة"""
+        try:
+            # استخراج الجهات المخصصة (غير الأساسية)
+            custom_departments = []
+            for i in range(self.issuing_dept.count()):
+                dept = self.issuing_dept.itemText(i)
+                if dept not in APP_SETTINGS.DEFAULT_DEPARTMENTS:
+                    custom_departments.append(dept)
+            
+            # تحديد مسار ملف الإعدادات
+            settings_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../settings.json')
+            
+            # تحميل الإعدادات الموجودة أو إنشاء جديدة
+            settings = {}
+            if os.path.exists(settings_file):
+                try:
+                    with open(settings_file, 'r', encoding='utf-8') as f:
+                        settings = json.load(f)
+                except:
+                    settings = {}
+            
+            # تحديث الجهات المخصصة
+            settings['custom_departments'] = custom_departments
+            
+            # إنشاء المجلد إذا لم يكن موجوداً
+            os.makedirs(os.path.dirname(settings_file), exist_ok=True)
+            
+            # حفظ الإعدادات
+            with open(settings_file, 'w', encoding='utf-8') as f:
+                json.dump(settings, f, ensure_ascii=False, indent=2)
+            
+        except Exception as e:
+            print(f"[ERROR] خطأ في حفظ الجهات المخصصة: {e}")
     
     # =========================================================================
     # وظائف الحصول على البيانات
