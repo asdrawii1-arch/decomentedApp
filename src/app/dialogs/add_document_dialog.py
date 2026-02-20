@@ -15,7 +15,7 @@ from PyQt6.QtWidgets import (
     QDialog, QWidget, QVBoxLayout, QHBoxLayout, QFormLayout,
     QLineEdit, QLabel, QPushButton, QComboBox, QSpinBox,
     QTextEdit, QDialogButtonBox, QFileDialog, QMessageBox,
-    QProgressDialog
+    QProgressDialog, QGroupBox, QScrollArea
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 
@@ -62,8 +62,22 @@ class AddDocumentDialog(QDialog):
             image_manager: مدير الصور
         """
         super().__init__(parent)
-        self.setWindowTitle('إضافة وثيقة جديدة')
-        self.setGeometry(100, 100, 600, 500)
+        self.setWindowTitle('📄 إضافة وثيقة جديدة')
+        
+        # تعيين حجم النافذة مناسب ومتناسق في الجهة اليمنى العلوية
+        if parent:
+            # حجم مناسب في الجهة اليمنى العلوية من النافذة الأب
+            parent_geom = parent.geometry()
+            dialog_width = 980
+            dialog_height = 650
+            dialog_x = parent_geom.x() + parent_geom.width() - dialog_width - 20
+            dialog_y = parent_geom.y() + 30
+            self.setGeometry(dialog_x, dialog_y, dialog_width, dialog_height)
+        else:
+            # حجم افتراضي مناسب في الجهة اليمنى العلوية
+            self.setGeometry(300, 50, 980, 650)
+        
+        self.setMinimumSize(880, 580)
         
         self.db = db
         self.image_manager = image_manager
@@ -76,151 +90,517 @@ class AddDocumentDialog(QDialog):
         self.apply_dialog_styles()
 
     def apply_dialog_styles(self):
-        """Apply dialog-level styles to match the light theme"""
+        """Apply enhanced modern dialog styles"""
         self.setStyleSheet(f"""
             QDialog {{
-                background-color: {COLORS.BACKGROUND_LIGHT};
+                background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                    stop: 0 {COLORS.BACKGROUND},
+                    stop: 1 {COLORS.BACKGROUND_LIGHT});
                 color: {COLORS.TEXT_PRIMARY};
                 font-size: {FONT_SIZES.BODY}px;
-                font-family: 'Segoe UI', Arial, sans-serif;
+                font-family: 'Segoe UI', 'Tahoma', Arial, sans-serif;
             }}
-            QPushButton {{
-                background-color: {COLORS.ACCENT};
-                color: {COLORS.TEXT_WHITE};
+            
+            /* Enhanced Group Boxes */
+            QGroupBox {{
+                font-weight: 600;
+                font-size: {FONT_SIZES.TITLE_SMALL}px;
+                color: {COLORS.TEXT_PRIMARY};
+                border: 2px solid {COLORS.BORDER};
+                border-radius: 10px;
+                margin: 15px 5px 10px 5px;
+                padding-top: 20px;
+                background-color: {COLORS.BACKGROUND_WHITE};
+            }}
+            
+            QGroupBox::title {{
+                subcontrol-origin: margin;
+                subcontrol-position: top left;
+                left: 15px;
+                top: 5px;
+                color: {COLORS.ACCENT};
+                font-weight: 700;
+                background-color: {COLORS.BACKGROUND_WHITE};
+                padding: 5px 15px;
+                border-radius: 6px;
                 border: 1px solid {COLORS.BORDER};
-                border-radius: {DIMENSIONS.BORDER_RADIUS_MEDIUM}px;
-                padding: {DIMENSIONS.PADDING_SMALL}px {DIMENSIONS.PADDING_MEDIUM}px;
-                min-height: {DIMENSIONS.BUTTON_HEIGHT}px;
             }}
-            QLineEdit, QTextEdit, QComboBox {{
+            
+            /* Enhanced Labels */
+            QLabel {{
+                color: {COLORS.TEXT_PRIMARY};
+                font-weight: 500;
+                padding: 5px;
+            }}
+            
+            /* Enhanced Input Fields */
+            QLineEdit {{
                 background-color: {COLORS.BACKGROUND_WHITE};
                 color: {COLORS.TEXT_PRIMARY};
-                border: 1px solid {COLORS.BORDER};
-                border-radius: {DIMENSIONS.BORDER_RADIUS_MEDIUM}px;
+                border: 2px solid {COLORS.BORDER};
+                border-radius: 8px;
+                padding: 10px 14px;
+                font-size: {FONT_SIZES.INPUT}px;
+                selection-background-color: {COLORS.SELECTION_BG};
+                min-height: 20px;
+            }}
+            
+            QLineEdit:focus {{
+                border: 2px solid {COLORS.ACCENT};
+                background-color: {COLORS.BACKGROUND_WHITE};
+                outline: none;
+            }}
+            
+            QLineEdit:hover {{
+                border-color: {COLORS.BORDER_DARK};
+            }}
+            
+            QTextEdit {{
+                background-color: {COLORS.BACKGROUND_WHITE};
+                color: {COLORS.TEXT_PRIMARY};
+                border: 2px solid {COLORS.BORDER};
+                border-radius: 8px;
+                padding: 10px;
+                font-size: {FONT_SIZES.INPUT}px;
+            }}
+            
+            QTextEdit:focus {{
+                border: 2px solid {COLORS.ACCENT};
+            }}
+            
+            /* Enhanced ComboBox */
+            QComboBox {{
+                background-color: {COLORS.BACKGROUND_WHITE};
+                color: {COLORS.TEXT_PRIMARY};
+                border: 2px solid {COLORS.BORDER};
+                border-radius: 8px;
+                padding: 10px 14px;
+                font-size: {FONT_SIZES.INPUT}px;
+                min-width: 200px;
+                min-height: 20px;
+            }}
+            
+            QComboBox:hover {{
+                border-color: {COLORS.BORDER_DARK};
+                background-color: {COLORS.HOVER_BG};
+            }}
+            
+            QComboBox:focus {{
+                border: 2px solid {COLORS.ACCENT};
+            }}
+            
+            QComboBox::drop-down {{
+                border: none;
+                width: 35px;
+                border-left: 1px solid {COLORS.BORDER};
+                border-top-right-radius: 8px;
+                border-bottom-right-radius: 8px;
+                background-color: {COLORS.SECONDARY};
+            }}
+            
+            QComboBox::down-arrow {{
+                width: 14px;
+                height: 10px;
+                border-left: 5px solid transparent;
+                border-right: 5px solid transparent;
+                border-top: 7px solid {COLORS.TEXT_SECONDARY};
+            }}
+            
+            QComboBox QAbstractItemView {{
+                background-color: {COLORS.BACKGROUND_WHITE};
+                color: {COLORS.TEXT_PRIMARY};
+                selection-background-color: {COLORS.SELECTION_BG};
+                selection-color: {COLORS.SELECTION_TEXT};
+                border: 2px solid {COLORS.ACCENT};
+                border-radius: 8px;
+                padding: 5px;
+            }}
+            
+            /* Enhanced Buttons */
+            QPushButton {{
+                background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                    stop: 0 {COLORS.ACCENT},
+                    stop: 1 #2563eb);
+                color: {COLORS.TEXT_WHITE};
+                border: 1px solid {COLORS.ACCENT};
+                border-radius: 10px;
+                padding: 12px 20px;
+                font-weight: 600;
+                font-size: {FONT_SIZES.BUTTON}px;
+                min-height: 25px;
+                min-width: 120px;
+            }}
+            
+            QPushButton:hover {{
+                background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                    stop: 0 #4f46e5,
+                    stop: 1 {COLORS.ACCENT});
+            }}
+            
+            QPushButton:pressed {{
+                background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                    stop: 0 #3730a3,
+                    stop: 1 #1e40af);
+            }}
+            
+            /* Special Button Styles */
+            QPushButton[class="scan-btn"] {{
+                background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                    stop: 0 {COLORS.SUCCESS},
+                    stop: 1 #047857);
+                border: 1px solid {COLORS.SUCCESS};
+            }}
+            
+            QPushButton[class="scan-btn"]:hover {{
+                background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                    stop: 0 #10b981,
+                    stop: 1 {COLORS.SUCCESS});
+            }}
+            
+            QPushButton[class="folder-btn"] {{
+                background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                    stop: 0 {COLORS.WARNING},
+                    stop: 1 #c2410c);
+                border: 1px solid {COLORS.WARNING};
+            }}
+            
+            QPushButton[class="folder-btn"]:hover {{
+                background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                    stop: 0 #f59e0b,
+                    stop: 1 {COLORS.WARNING});
+            }}
+            
+            /* Enhanced SpinBox */
+            QSpinBox {{
+                background-color: {COLORS.BACKGROUND_WHITE};
+                color: {COLORS.TEXT_PRIMARY};
+                border: 2px solid {COLORS.BORDER};
+                border-radius: 8px;
+                padding: 10px 14px;
+                font-size: {FONT_SIZES.INPUT}px;
+                min-height: 20px;
+            }}
+            
+            QSpinBox:focus {{
+                border: 2px solid {COLORS.ACCENT};
+            }}
+            
+            QSpinBox::up-button, QSpinBox::down-button {{
+                background-color: {COLORS.SECONDARY};
+                border: none;
+                width: 25px;
+                border-radius: 4px;
+            }}
+            
+            QSpinBox::up-button:hover, QSpinBox::down-button:hover {{
+                background-color: {COLORS.BORDER_DARK};
+            }}
+            
+            /* Status Labels */
+            QLabel[class="status-connected"] {{
+                color: {COLORS.SUCCESS};
+                font-weight: 600;
+                padding: 8px 12px;
+                background-color: {COLORS.SUCCESS_LIGHT};
+                border-radius: 6px;
+                border: 1px solid {COLORS.SUCCESS};
+            }}
+            
+            QLabel[class="status-disconnected"] {{
+                color: {COLORS.WARNING};
+                font-weight: 600;
+                padding: 8px 12px;
+                background-color: {COLORS.WARNING_LIGHT};
+                border-radius: 6px;
+                border: 1px solid {COLORS.WARNING};
+            }}
+            
+            QLabel[class="status-unavailable"] {{
+                color: {COLORS.ERROR};
+                font-weight: 600;
+                padding: 8px 12px;
+                background-color: {COLORS.ERROR_LIGHT};
+                border-radius: 6px;
+                border: 1px solid {COLORS.ERROR};
+            }}
+            
+            QLabel[class="count-label"] {{
+                color: {COLORS.INFO};
+                font-weight: 600;
+                font-size: {FONT_SIZES.TITLE_SMALL}px;
+                padding: 10px 15px;
+                background-color: {COLORS.INFO_LIGHT};
+                border-radius: 8px;
+                border: 2px solid {COLORS.INFO};
             }}
         """)
     
     def _init_ui(self):
-        """إنشاء واجهة المستخدم"""
-        layout = QFormLayout()
-        try:
-            layout.setSpacing(DIMENSIONS.PADDING_MEDIUM)
-            layout.setContentsMargins(
-                DIMENSIONS.MARGIN_MEDIUM, DIMENSIONS.MARGIN_MEDIUM,
-                DIMENSIONS.MARGIN_MEDIUM, DIMENSIONS.MARGIN_MEDIUM
-            )
-        except Exception:
-            pass
+        """إنشاء واجهة المستخدم المدمجة والمرتبة"""
+        # التخطيط الرئيسي مع مسافات مختصرة
+        main_layout = QVBoxLayout()
+        main_layout.setSpacing(8)
+        main_layout.setContentsMargins(10, 10, 10, 10)
         
-        # حقول الإدخال الأساسية
-        self._create_basic_fields(layout)
+        # عنوان النافذة
+        self._create_header(main_layout)
         
-        # مجلد السنة
-        self._create_year_folder_field(layout)
+        # التخطيط الأفقي الرئيسي مدمج (عمودين مختصرين)
+        content_layout = QHBoxLayout()
+        content_layout.setSpacing(12)
         
-        # أزرار المسح
-        self._create_scan_buttons(layout)
+        # العمود الأيسر (معلومات الوثيقة)
+        left_column = QVBoxLayout()
+        left_column.setSpacing(10)
+        
+        # مجموعة معلومات الوثيقة الأساسية - مدمجة ومختصرة
+        self._create_document_info_group(left_column)
+        
+        # مجموعة إعدادات الحفظ - مختصرة
+        self._create_storage_group(left_column)
+        
+        # العمود الأيمن (المسح والحالة)
+        right_column = QVBoxLayout()
+        right_column.setSpacing(10)
+        
+        # مجموعة المسح الضوئي - مختصرة
+        self._create_scanning_group(right_column)
+        
+        # حالة النظام - مختصرة
+        self._create_status_section(right_column)
+        
+        # إضافة الأعمدة للتخطيط الأفقي مع نسبة محسّنة
+        content_layout.addLayout(left_column, 3)
+        content_layout.addLayout(right_column, 2)
+        
+        main_layout.addLayout(content_layout)
         
         # أزرار الحوار
-        self._create_dialog_buttons(layout)
+        self._create_dialog_buttons(main_layout)
         
-        self.setLayout(layout)
+        self.setLayout(main_layout)
     
-    def _create_basic_fields(self, layout):
-        """إنشاء حقول الإدخال الأساسية"""
+    def _create_header(self, layout):
+        """إنشاء رأس النافذة مدمج ومختصر"""
+        title_label = QLabel("📄 إضافة وثيقة جديدة")
+        title_label.setStyleSheet(f"""
+            QLabel {{
+                font-size: 16px;
+                font-weight: 700;
+                color: white;
+                padding: 6px 12px;
+                background: qlineargradient(x1: 0, y1: 0, x2: 1, y2: 0,
+                    stop: 0 {COLORS.ACCENT}, stop: 1 #6366f1);
+                border-radius: 6px;
+                margin-bottom: 3px;
+            }}
+        """)
+        title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(title_label)
+    
+    def _create_document_info_group(self, layout):
+        """إنشاء مجموعة معلومات الوثيقة المدمجة والمرتبة"""
+        group = QGroupBox("📋 معلومات الوثيقة")
+        group_layout = QFormLayout(group)
+        group_layout.setSpacing(8)
+        group_layout.setContentsMargins(12, 15, 12, 10)
+        
         # اسم الوثيقة
         self.doc_name = QLineEdit()
-        layout.addRow('اسم الوثيقة:', self.doc_name)
+        self.doc_name.setPlaceholderText("أدخل رقم واسم الوثيقة (مثال: 123 في 15-2-2025)")
+        group_layout.addRow('📝 اسم/رقم الوثيقة:', self.doc_name)
         
-        # التاريخ
+        # التاريخ في صف منفصل مختصر
         self.doc_date = QLineEdit()
         self.doc_date.setPlaceholderText('مثال: 23-3-2025')
-        layout.addRow('تاريخ الوثيقة:', self.doc_date)
+        group_layout.addRow('📅 التاريخ:', self.doc_date)
         
-        # العنوان
+        # المضمون في صف منفصل
         self.doc_title = QLineEdit()
-        layout.addRow('عنوان الوثيقة:', self.doc_title)
+        self.doc_title.setPlaceholderText("موضوع الوثيقة...")
+        group_layout.addRow('📄 المضمون:', self.doc_title)
         
         # جهة الإصدار
         self.issuing_dept = QComboBox()
         self.issuing_dept.addItems(APP_SETTINGS.DEFAULT_DEPARTMENTS)
-        layout.addRow('جهة الإصدار:', self.issuing_dept)
+        group_layout.addRow('🏢 جهة الإصدار:', self.issuing_dept)
         
-        # تصنيف الوثيقة
+        # التصنيف في صف منفصل
         self.doc_classification = QLineEdit()
-        layout.addRow('تصنيف الوثيقة:', self.doc_classification)
+        self.doc_classification.setPlaceholderText("سري، عادي، مهم...")
+        group_layout.addRow('🏷️ التصنيف:', self.doc_classification)
         
-        # الفقرة القانونية
-        self.legal_paragraph = QTextEdit()
-        self.legal_paragraph.setMaximumHeight(100)
-        layout.addRow('الفقرة القانونية:', self.legal_paragraph)
+        # الفقرة القانونية مختصرة
+        self.legal_paragraph = QLineEdit()
+        self.legal_paragraph.setPlaceholderText("المادة القانونية (اختياري)...")
+        group_layout.addRow('📚 المادة القانونية:', self.legal_paragraph)
         
-        # عدد الوجوه
+        # عدد الوجوه مختصر
         self.sides = QSpinBox()
         self.sides.setMinimum(1)
         self.sides.setMaximum(2)
         self.sides.setValue(1)
-        layout.addRow('عدد الوجوه:', self.sides)
+        self.sides.setSuffix(" وجه")
+        group_layout.addRow('📄 عدد الوجوه:', self.sides)
+        
+        layout.addWidget(group)
+    
+    def _create_storage_group(self, layout):
+        """إنشاء مجموعة إعدادات الحفظ مختصرة"""
+        group = QGroupBox("💾 مجلد الحفظ")
+        group_layout = QVBoxLayout(group)
+        group_layout.setSpacing(8)
+        group_layout.setContentsMargins(12, 15, 12, 10)
+        
+        # صف مجلد السنة مختصر
+        year_widget = QWidget()
+        year_layout = QHBoxLayout(year_widget)
+        year_layout.setContentsMargins(0, 0, 0, 0)
+        year_layout.setSpacing(8)
+        
+        self.year_folder_edit = QLineEdit()
+        self.year_folder_edit.setReadOnly(True)
+        self.year_folder_edit.setPlaceholderText('اختر مجلد السنة...')
+        
+        year_select_btn = QPushButton(f'{ICONS.FOLDER} اختيار')
+        year_select_btn.setProperty("class", "folder-btn")
+        year_select_btn.clicked.connect(self._on_choose_year_folder)
+        year_select_btn.setFixedWidth(80)
+        
+        year_layout.addWidget(self.year_folder_edit, 1)
+        year_layout.addWidget(year_select_btn)
+        
+        group_layout.addWidget(QLabel("📁 مجلد السنة:"))
+        group_layout.addWidget(year_widget)
+        
+        layout.addWidget(group)
+    
+    def _create_scanning_group(self, layout):
+        """إنشاء مجموعة المسح الضوئي مختصرة"""
+        group = QGroupBox("📷 المسح والصور")
+        group_layout = QVBoxLayout(group)
+        group_layout.setSpacing(8)
+        group_layout.setContentsMargins(12, 15, 12, 10)
+        
+        # أزرار المسح مختصرة
+        scan_row = QHBoxLayout()
+        
+        # مسح صورة واحدة  
+        scan_one_btn = QPushButton(f'{ICONS.SCAN_SINGLE} مسح واحد')
+        scan_one_btn.setProperty("class", "scan-btn")
+        scan_one_btn.clicked.connect(self.scan_manual)
+        scan_one_btn.setMinimumHeight(32)
+        
+        # مسح مرفقات متعددة
+        scan_multiple_btn = QPushButton(f'{ICONS.SCAN_MULTIPLE} متعدد')
+        scan_multiple_btn.setProperty("class", "scan-btn")
+        scan_multiple_btn.clicked.connect(self.scan_multiple)
+        scan_multiple_btn.setMinimumHeight(32)
+        
+        scan_row.addWidget(scan_one_btn)
+        scan_row.addWidget(scan_multiple_btn)
+        group_layout.addLayout(scan_row)
+        
+        # استخراج تلقائي مختصر
+        ocr_btn = QPushButton(f'{ICONS.SEARCH} استخراج تلقائي')
+        ocr_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                    stop: 0 {COLORS.BUTTON_PURPLE},
+                    stop: 1 #5b21b6);
+                border: 1px solid {COLORS.BUTTON_PURPLE};
+                min-height: 32px;
+            }}
+            QPushButton:hover {{
+                background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                    stop: 0 #8b5cf6,
+                    stop: 1 {COLORS.BUTTON_PURPLE});
+            }}
+        """)
+        ocr_btn.clicked.connect(self.scan_and_extract)
+        group_layout.addWidget(ocr_btn)
+        
+        layout.addWidget(group)
+    
+    def _create_status_section(self, layout):
+        """إنشاء قسم حالة النظام مختصر"""
+        group = QGroupBox("📊 الحالة")
+        group_layout = QVBoxLayout(group)
+        group_layout.setSpacing(6)
+        group_layout.setContentsMargins(12, 12, 12, 8)
         
         # عدد الصور الممسوحة
-        self.images_label = QLabel('عدد الصور الممسوحة: 0')
-        layout.addRow(self.images_label)
+        self.images_label = QLabel('الصور: 0')
+        self.images_label.setProperty("class", "count-label")
+        self.images_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        group_layout.addWidget(self.images_label)
         
         # حالة السكانر
         self.scanner_status_label = QLabel()
         self._update_scanner_status()
-        layout.addRow(self.scanner_status_label)
-    
-    def _create_year_folder_field(self, layout):
-        """إنشاء حقل اختيار مجلد السنة"""
-        year_widget = QWidget()
-        year_widget_layout = QHBoxLayout()
-        year_widget_layout.setContentsMargins(0, 0, 0, 0)
+        group_layout.addWidget(self.scanner_status_label)
         
-        self.year_folder_edit = QLineEdit()
-        self.year_folder_edit.setReadOnly(True)
-        self.year_folder_edit.setPlaceholderText('لم يتم اختيار مجلد السنة')
-        year_widget_layout.addWidget(self.year_folder_edit)
-        
-        year_select_btn = QPushButton(f'{ICONS.FOLDER} اختيار مجلد السنة')
-        year_select_btn.clicked.connect(self._on_choose_year_folder)
-        year_widget_layout.addWidget(year_select_btn)
-        
-        year_widget.setLayout(year_widget_layout)
-        layout.addRow('مجلد السنة:', year_widget)
-    
-    def _create_scan_buttons(self, layout):
-        """إنشاء أزرار المسح"""
-        scan_layout = QHBoxLayout()
-        
-        # مسح صورة واحدة
-        scan_one_btn = QPushButton(f'{ICONS.SCAN_SINGLE} مسح صورة واحدة')
-        scan_one_btn.clicked.connect(self.scan_manual)
-        scan_layout.addWidget(scan_one_btn)
-        
-        # مسح مرفقات متعددة
-        scan_multiple_btn = QPushButton(f'{ICONS.SCAN_MULTIPLE} مسح مرفقات متعددة')
-        scan_multiple_btn.clicked.connect(self.scan_multiple)
-        scan_layout.addWidget(scan_multiple_btn)
-        
-        layout.addRow(scan_layout)
-        
-        # استخراج تلقائي
-        ocr_btn = QPushButton(f'{ICONS.SEARCH} استخراج تلقائي من الصور (بطيء)')
-        ocr_btn.clicked.connect(self.scan_and_extract)
-        layout.addRow(ocr_btn)
+        layout.addWidget(group)
     
     def _create_dialog_buttons(self, layout):
-        """إنشاء أزرار الحوار"""
-        button_box = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
-        )
-        button_box.accepted.connect(self.accept)
-        button_box.rejected.connect(self.reject)
-        layout.addRow(button_box)
+        """إنشاء أزرار الحوار مختصرة"""
+        button_widget = QWidget()
+        button_layout = QHBoxLayout(button_widget)
+        button_layout.setContentsMargins(10, 8, 10, 8)
+        button_layout.setSpacing(12)
+        
+        # زر الإلغاء مختصر
+        cancel_btn = QPushButton(f"❌ إلغاء")
+        cancel_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                    stop: 0 {COLORS.ERROR},
+                    stop: 1 #b91c1c);
+                border: 1px solid {COLORS.ERROR};
+                min-height: 35px;
+                min-width: 100px;
+                font-size: 13px;
+                font-weight: 600;
+            }}
+            QPushButton:hover {{
+                background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                    stop: 0 #ef4444,
+                    stop: 1 {COLORS.ERROR});
+            }}
+        """)
+        cancel_btn.clicked.connect(self.reject)
+        
+        # زر الحفظ مختصر  
+        ok_btn = QPushButton(f"✅ حفظ")
+        ok_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                    stop: 0 {COLORS.SUCCESS},
+                    stop: 1 #047857);
+                border: 1px solid {COLORS.SUCCESS};
+                min-height: 35px;
+                min-width: 100px;
+                font-size: 13px;
+                font-weight: 600;
+            }}
+            QPushButton:hover {{
+                background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                    stop: 0 #10b981,
+                    stop: 1 {COLORS.SUCCESS});
+            }}
+        """)
+        ok_btn.clicked.connect(self.accept)
+        ok_btn.setDefault(True)
+        
+        button_layout.addStretch()
+        button_layout.addWidget(cancel_btn)
+        button_layout.addWidget(ok_btn)
+        button_layout.addStretch()
+        
+        layout.addWidget(button_widget)
     
     def _update_scanner_status(self):
-        """تحديث حالة السكانر في الواجهة"""
+        """تحديث حالة السكانر في الواجهة مع تصميم محسّن"""
         global SCANNER_AVAILABLE, SCANNER_COUNT
         
         if SCANNER_AVAILABLE:
@@ -232,19 +612,23 @@ class AddDocumentDialog(QDialog):
         
         if not SCANNER_AVAILABLE:
             self.scanner_status_label.setText(
-                f'{ICONS.WARNING} حالة السكانر: مكتبة pywin32 غير مثبتة - استخدم اختيار الصور من الحاسب'
+                f'{ICONS.WARNING} مكتبة المسح غير مثبتة - يمكنك اختيار الصور من الحاسب'
             )
-            self.scanner_status_label.setStyleSheet(SCANNER_STATUS_STYLES['unavailable'])
+            self.scanner_status_label.setProperty("class", "status-unavailable")
         elif SCANNER_COUNT == 0:
             self.scanner_status_label.setText(
-                f'{ICONS.WARNING} حالة السكانر: لا يوجد سكانر متصل - قم بتوصيل السكانر أو اختر صورة من الحاسب'
+                f'{ICONS.WARNING} لا يوجد سكانر متصل - يمكنك اختيار الصور من الحاسب'
             )
-            self.scanner_status_label.setStyleSheet(SCANNER_STATUS_STYLES['disconnected'])
+            self.scanner_status_label.setProperty("class", "status-disconnected")
         else:
             self.scanner_status_label.setText(
-                f'{ICONS.SUCCESS} حالة السكانر: متصل ({SCANNER_COUNT} جهاز)'
+                f'{ICONS.SUCCESS} السكانر متصل ومتاح ({SCANNER_COUNT} جهاز)'
             )
-            self.scanner_status_label.setStyleSheet(SCANNER_STATUS_STYLES['connected'])
+            self.scanner_status_label.setProperty("class", "status-connected")
+        
+        # تطبيق الأسلوب الجديد
+        self.scanner_status_label.style().unpolish(self.scanner_status_label)
+        self.scanner_status_label.style().polish(self.scanner_status_label)
     
     def select_year_folder(self):
         """استخدم الدالة المساعدة الموحدة لاختيار مجلد السنة"""
@@ -280,9 +664,18 @@ class AddDocumentDialog(QDialog):
         return year_folder
     
     def _update_images_count(self):
-        """تحديث عدد الصور الممسوحة"""
+        """تحديث عدد الصور الممسوحة مع تصميم محسّن"""
         count = len(self.scanned_images)
-        self.images_label.setText(f'عدد الصور الممسوحة: {count}')
+        if count == 0:
+            self.images_label.setText(f'📷 عدد الصور الممسوحة: {count} (لا توجد صور)')
+        elif count == 1:
+            self.images_label.setText(f'📷 عدد الصور الممسوحة: {count} (صورة واحدة)')
+        else:
+            self.images_label.setText(f'📷 عدد الصور الممسوحة: {count} (وثيقة رئيسية + {count-1} مرفق)')
+        
+        # تطبيق الأسلوب المحدث
+        self.images_label.style().unpolish(self.images_label)
+        self.images_label.style().polish(self.images_label)
     
     # =========================================================================
     # وظائف المسح الضوئي
@@ -943,7 +1336,7 @@ class AddDocumentDialog(QDialog):
             'doc_title': self.doc_title.text(),
             'issuing_dept': dept,
             'doc_classification': self.doc_classification.text(),
-            'legal_paragraph': self.legal_paragraph.toPlainText(),
+            'legal_paragraph': self.legal_paragraph.text(),
             'sides': self.sides.value(),
             'scanned_image': self.scanned_image_path,
             'scanned_images': self.scanned_images,
