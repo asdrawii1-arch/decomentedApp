@@ -44,6 +44,7 @@ class DocumentViewerWindow(QMainWindow):
         self.image_cache = {}  # cache للصور المحملة
         self.scaled_cache = {}  # cache للصور المُحجمة
         self.target_width = 700  # العرض المستهدف للصور
+        self._programmatic_update = False  # علامة للتحديث البرمجي
         
         # معلومات تشخيصية محدودة
         if len(self.image_paths) > 0:
@@ -162,7 +163,13 @@ class DocumentViewerWindow(QMainWindow):
         
         self.image_list = QListWidget()
         self.image_list.setSelectionMode(QListWidget.SelectionMode.MultiSelection)
+        
+        # إشارة للتنقل السريع بين الصور (تنقل فوري عند النقر)
+        self.image_list.itemClicked.connect(self.on_image_clicked)
+        
+        # إشارة للوظائف الأخرى (حذف، تصدير، إلخ)
         self.image_list.itemSelectionChanged.connect(self.on_image_selected)
+        
         self.image_list.setMaximumWidth(150)
         
         # إضافة الصور إلى القائمة
@@ -172,25 +179,6 @@ class DocumentViewerWindow(QMainWindow):
             self.image_list.addItem(item)
         
         image_list_layout.addWidget(self.image_list)
-        
-        # أزرار التحكم بالقائمة
-        image_buttons_layout = QVBoxLayout()
-        
-        select_all_images_btn = QPushButton('✓ اختر الكل')
-        select_all_images_btn.clicked.connect(self.select_all_images)
-        image_buttons_layout.addWidget(select_all_images_btn)
-        
-        deselect_all_images_btn = QPushButton('✗ إلغاء')
-        deselect_all_images_btn.clicked.connect(self.deselect_all_images)
-        image_buttons_layout.addWidget(deselect_all_images_btn)
-        
-        delete_selected_images_btn = QPushButton('🗑️ حذف المحددة')
-        delete_selected_images_btn.setStyleSheet('background-color: #e74c3c; color: white;')
-        delete_selected_images_btn.clicked.connect(self.delete_selected_images)
-        image_buttons_layout.addWidget(delete_selected_images_btn)
-        
-        image_buttons_layout.addStretch()
-        image_list_layout.addLayout(image_buttons_layout)
         
         content_layout.addLayout(image_list_layout, 0)
         
@@ -281,13 +269,15 @@ class DocumentViewerWindow(QMainWindow):
             self.page_spin.setValue(index + 1)
             self.page_spin.blockSignals(False)
             
-            # تحديث اختيار الصورة في القائمة بسرعة
+            # تحديث اختيار الصورة في القائمة بسرعة (منع التداخل)
+            self._programmatic_update = True
             self.image_list.blockSignals(True)
             self.image_list.clearSelection()
             if self.image_list.count() > index:
                 self.image_list.item(index).setSelected(True)
                 self.image_list.setCurrentRow(index)
             self.image_list.blockSignals(False)
+            self._programmatic_update = False
             
             # تحديث معلومات الصورة
             self._update_current_image_info(index)
@@ -632,137 +622,26 @@ class DocumentViewerWindow(QMainWindow):
             except Exception as e:
                 QMessageBox.critical(self, 'خطأ', f'فشل إنشاء PDF: {str(e)}')
 
-    def on_image_selected(self):
-        """عند اختيار صورة من القائمة"""
-        selected_items = self.image_list.selectedItems()
-        if selected_items:
-            index = self.image_list.row(selected_items[0])
+    def on_image_clicked(self, item):
+        """عند النقر على صورة من القائمة - للتنقل السريع"""
+        if item:
+            index = self.image_list.row(item)
+            # إلغاء كل التحديدات الأخرى وتحديد هذا العنصر فقط
+            self.image_list.clearSelection()
+            item.setSelected(True)
+            # عرض الصورة فوراً
             self.display_image(index)
     
-    def select_all_images(self):
-        """اختيار جميع الصور"""
-        for i in range(self.image_list.count()):
-            self.image_list.item(i).setSelected(True)
-        QMessageBox.information(self, 'تحديد', f'تم تحديد جميع الصور ({self.image_list.count()} صورة)')
-    
-    def deselect_all_images(self):
-        """إلغاء تحديد جميع الصور"""
-        self.image_list.clearSelection()
-    
-    def delete_selected_images(self):
-        """حذف الصور المحددة من الوثيقة"""
-        selected_items = self.image_list.selectedItems()
-        
-        if not selected_items:
-            QMessageBox.warning(self, 'تنبيه', 'يجب تحديد صور للحذف أولاً')
-            return
-        
-        count = len(selected_items)
-        reply = QMessageBox.question(
-            self,
-            'تأكيد الحذف',
-            f'هل أنت متأكد من حذف {count} صورة؟\n\nسيتم حذفها من قاعدة البيانات والقرص الصلب',
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-        )
-        
-        if reply == QMessageBox.StandardButton.Yes:
-            try:
-                from pathlib import Path
-                import sys
-                
-                print(f"\n[DELETE] بدء حذف {count} صورة...")
-                
-                # احصل على قائمة الصور المراد حذفها (قبل تعديل القائمة)
-                images_to_delete = []
-                for item in selected_items:
-                    index = self.image_list.row(item)
-                    if 0 <= index < len(self.image_paths):
-                        images_to_delete.append((index, self.image_paths[index]))
-                
-                print(f"[DELETE] الصور المراد حذفها: {len(images_to_delete)}")
-                
-                # احذفها من الأعلى للأسفل لتجنب مشاكل الفهرسة
-                deleted_count = 0
-                deleted_paths = []
-                
-                for index, image_path in sorted(images_to_delete, reverse=True):
-                    try:
-                        print(f"[DELETE] حذف صورة #{index}: {image_path}")
-                        
-                        path = Path(image_path)
-                        if path.exists():
-                            path.unlink()
-                            deleted_count += 1
-                            deleted_paths.append(image_path)
-                            print(f"[DELETE] ✓ تم حذف الملف: {image_path}")
-                        else:
-                            print(f"[WARNING] الملف غير موجود: {image_path}")
-                        
-                        # حذف الصورة المصغرة إن وجدت
-                        try:
-                            thumb_path = path.parent.parent / 'thumbnails' / f'{path.stem}_thumb.jpg'
-                            if thumb_path.exists():
-                                thumb_path.unlink()
-                                print(f"[DELETE] ✓ تم حذف الصورة المصغرة")
-                        except Exception as e:
-                            print(f"[WARNING] فشل حذف الصورة المصغرة: {e}")
-                        
-                    except Exception as e:
-                        print(f"[ERROR] خطأ في حذف {image_path}: {e}")
-                    
-                    # احذفها من القائمة والبيانات
-                    try:
-                        self.image_list.takeItem(index)
-                        self.image_paths.pop(index)
-                        print(f"[DELETE] ✓ تم إزالة من القائمة")
-                    except Exception as e:
-                        print(f"[ERROR] خطأ في إزالة من القائمة: {e}")
-                
-                print(f"[DELETE] تم حذف {deleted_count} صورة من النظام")
-                
-                # حذف الصور من قاعدة البيانات
-                if deleted_paths:
-                    try:
-                        print(f"[DELETE] جاري حذف من قاعدة البيانات...")
-                        sys.path.insert(0, str(Path(__file__).parent.parent))
-                        from database.db_manager import DatabaseManager
-                        
-                        db = DatabaseManager()
-                        for image_path in deleted_paths:
-                            try:
-                                db.delete_image_by_path(image_path)
-                                print(f"[DELETE] ✓ تم حذف من قاعدة البيانات: {image_path}")
-                            except Exception as e:
-                                print(f"[ERROR] فشل حذف من قاعدة البيانات: {e}")
-                    except Exception as e:
-                        print(f"[ERROR] خطأ في حذف من قاعدة البيانات: {e}")
-                
-                # تحديث العرض
-                print(f"[DELETE] تحديث الواجهة...")
-                if self.image_paths:
-                    self.display_image(0)
-                    print(f"[DELETE] عرض الصورة الأولى المتبقية")
-                else:
-                    self.image_label.setText("❌ لا توجد صور متبقية")
-                    self.page_spin.setMaximum(0)
-                    print(f"[DELETE] لا توجد صور متبقية")
-                
-                # رسالة النجاح
-                if deleted_count > 0:
-                    msg = f'تم حذف {deleted_count} صورة بنجاح'
-                    QMessageBox.information(self, 'نجح', msg)
-                    print(f"[DELETE] {msg}")
-                else:
-                    msg = 'لم يتم حذف أي صور'
-                    QMessageBox.warning(self, 'تنبيه', msg)
-                    print(f"[DELETE] {msg}")
-            
-            except Exception as e:
-                error_msg = f'حدث خطأ أثناء الحذف:\n{str(e)}'
-                QMessageBox.critical(self, 'خطأ', error_msg)
-                print(f"[ERROR] خطأ حرج في حذف الصور: {e}")
-                import traceback
-                traceback.print_exc()
+    def on_image_selected(self):
+        """عند اختيار صورة من القائمة - للوظائف الأخرى مثل الحذف والتصدير"""
+        # التحديث الأساسي فقط، التنقل الأساسي يتم عبر on_image_clicked
+        # هذه الدالة تبقى فعالة للوظائف الأخرى مثل الحذف والتصدير
+        if not self._programmatic_update:
+            selected_items = self.image_list.selectedItems()
+            if selected_items:
+                # إذا لم يكن التحديث برمجياً، يمكن عرض الصورة أيضاً كاحتياط
+                index = self.image_list.row(selected_items[0])
+                self.display_image(index)
     
     def cleanup_cache(self):
         """تنظيف الـ cache لتوفير الذاكرة"""
