@@ -409,8 +409,8 @@ class DocumentViewerWindow(QMainWindow):
         right_layout.setSpacing(8)
         right_layout.setContentsMargins(10, 10, 10, 10)
         
-        # عنوان لوحة التحكم
-        control_title = QLabel('🎛️ التحكم')
+        # عنوان لوحة التحكم محسن
+        control_title = QLabel('🎛️ العرض')
         control_title.setStyleSheet(
             "font-size: 14px; font-weight: bold; padding: 6px; "
             "background-color: #2c3e50; color: white; border-radius: 6px; "
@@ -461,11 +461,11 @@ class DocumentViewerWindow(QMainWindow):
         separator.setFixedHeight(1)
         right_layout.addWidget(separator)
         
-        # زر ملء النافذة
-        fit_window_btn = QPushButton('📐')
+        # زر ملء النافذة مع اختصار
+        fit_window_btn = QPushButton('📐\nملء')
         fit_window_btn.clicked.connect(self.fit_to_window)
         fit_window_btn.setStyleSheet(
-            "QPushButton { padding: 10px; font-size: 16px; font-weight: bold; "
+            "QPushButton { padding: 8px; font-size: 12px; font-weight: bold; "
             "background-color: #3498db; color: white; border: none; border-radius: 6px; }"
             "QPushButton:hover { background-color: #2980b9; }"
             "QPushButton:pressed { background-color: #21618c; }"
@@ -474,11 +474,11 @@ class DocumentViewerWindow(QMainWindow):
         fit_window_btn.setMinimumHeight(40)
         right_layout.addWidget(fit_window_btn)
         
-        # زر الحجم الأصلي
-        actual_size_btn = QPushButton('📏')
+        # زر الحجم الأصلي مع اختصار
+        actual_size_btn = QPushButton('📏\n100%')
         actual_size_btn.clicked.connect(self.actual_size)
         actual_size_btn.setStyleSheet(
-            "QPushButton { padding: 10px; font-size: 16px; font-weight: bold; "
+            "QPushButton { padding: 8px; font-size: 12px; font-weight: bold; "
             "background-color: #9b59b6; color: white; border: none; border-radius: 6px; }"
             "QPushButton:hover { background-color: #8e44ad; }"
             "QPushButton:pressed { background-color: #7d3c98; }"
