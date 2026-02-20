@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QScrollArea, QPushButton, QSpinBox, QComboBox, QMessageBox,
     QFileDialog, QDialog, QDialogButtonBox, QListWidget, QListWidgetItem,
-    QSplitter
+    QSplitter, QSizePolicy
 )
 from PyQt6.QtGui import QPixmap, QFont
 from PyQt6.QtCore import Qt, QSize, pyqtSlot, QTimer
@@ -442,8 +442,8 @@ class DocumentViewerWindow(QMainWindow):
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.scroll_area.setSizePolicy(
-            self.scroll_area.sizePolicy().Expanding, 
-            self.scroll_area.sizePolicy().Expanding
+            QSizePolicy.Policy.Expanding, 
+            QSizePolicy.Policy.Expanding
         )
         self.scroll_area.setStyleSheet(
             "QScrollArea { border: none; background-color: transparent; }"
