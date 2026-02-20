@@ -12,7 +12,7 @@ from PyQt6.QtWidgets import (
     QSplitter
 )
 from PyQt6.QtGui import QPixmap, QFont
-from PyQt6.QtCore import Qt, QSize, pyqtSlot
+from PyQt6.QtCore import Qt, QSize, pyqtSlot, QTimer
 from PyQt6.QtPrintSupport import QPrinter, QPrintDialog
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -45,6 +45,10 @@ class DocumentViewerWindow(QMainWindow):
         self.scaled_cache = {}  # cache للصور المُحجمة
         self.target_width = 700  # العرض المستهدف للصور
         self._programmatic_update = False  # علامة للتحديث البرمجي
+        
+        # متغيرات التكبير والتصغير
+        self.zoom_factor = 1.0
+        self.original_pixmap = None
         
         # معلومات تشخيصية محدودة
         if len(self.image_paths) > 0:
@@ -141,10 +145,10 @@ class DocumentViewerWindow(QMainWindow):
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         
-        # التخطيط الرئيسي أفقي
+        # التخطيط الرئيسي أفقي محسن
         main_layout = QHBoxLayout()
-        main_layout.setSpacing(10)
-        main_layout.setContentsMargins(10, 10, 10, 10)
+        main_layout.setSpacing(5)  # تقليل المسافة
+        main_layout.setContentsMargins(5, 5, 5, 5)  # تقليل الهوامش
         
         # الجانب الأيسر - مستطيل معلومات الوثيقة وقائمة الصور
         left_panel = QWidget()
@@ -153,14 +157,14 @@ class DocumentViewerWindow(QMainWindow):
             "background-color: #f8f9fa; "
             "border: 2px solid #3498db; "
             "border-radius: 12px; "
-            "margin: 5px; }"
+            "margin: 2px; }"
         )
-        left_panel.setMaximumWidth(350)
-        left_panel.setMinimumWidth(320)
+        left_panel.setMaximumWidth(330)  # تقليل العرض قليلاً
+        left_panel.setMinimumWidth(300)  # تقليل العرض الأدنى
         
         left_layout = QVBoxLayout()
-        left_layout.setSpacing(10)
-        left_layout.setContentsMargins(15, 15, 15, 15)
+        left_layout.setSpacing(8)  # تقليل المسافة
+        left_layout.setContentsMargins(12, 12, 12, 12)  # تقليل الهوامش
         
         # معلومات الوثيقة في الأعلى
         doc_info_title = QLabel('📄 معلومات الوثيقة')
@@ -176,9 +180,9 @@ class DocumentViewerWindow(QMainWindow):
         self.current_image_info = QLabel()
         self.current_image_info.setStyleSheet(
             "QLabel { "
-            "background-color: white; color: #2c3e50; padding: 12px; "
+            "background-color: white; color: #000000; padding: 12px; "
             "font-size: 11px; border: 1px solid #bdc3c7; border-radius: 8px; "
-            "line-height: 1.4; }"
+            "line-height: 1.4; font-weight: bold; }"
         )
         self.current_image_info.setWordWrap(True)
         self.current_image_info.setMinimumHeight(120)
@@ -331,12 +335,13 @@ class DocumentViewerWindow(QMainWindow):
             "background-color: #ffffff; "
             "border: 2px solid #3498db; "
             "border-radius: 12px; "
-            "margin: 5px; }"
+            "margin: 2px; }"
         )
+        right_panel.setMinimumWidth(400)  # حد أدنى لضمان استخدام جيد للمساحة
         
         right_layout = QVBoxLayout()
-        right_layout.setSpacing(10)
-        right_layout.setContentsMargins(15, 15, 15, 15)
+        right_layout.setSpacing(5)  # تقليل المسافة
+        right_layout.setContentsMargins(10, 10, 10, 10)  # تقليل الهوامش
         
         # عنوان منطقة العرض
         viewer_title = QLabel('📸 عرض الوثيقة')
@@ -348,14 +353,80 @@ class DocumentViewerWindow(QMainWindow):
         viewer_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         right_layout.addWidget(viewer_title)
         
-        # منطقة عرض الصورة
+        # شريط أدوات التكبير والتصغير
+        zoom_toolbar = QWidget()
+        zoom_toolbar.setStyleSheet(
+            "QWidget { background-color: #ecf0f1; border: 1px solid #bdc3c7; border-radius: 6px; padding: 5px; }"
+        )
+        zoom_layout = QHBoxLayout()
+        zoom_layout.setSpacing(8)
+        
+        # زر التصغير
+        zoom_out_btn = QPushButton('🔍-')
+        zoom_out_btn.clicked.connect(self.zoom_out)
+        zoom_out_btn.setStyleSheet(
+            "QPushButton { padding: 8px 12px; font-size: 14px; font-weight: bold; "
+            "background-color: #e74c3c; color: white; border: none; border-radius: 4px; }"
+            "QPushButton:hover { background-color: #c0392b; }"
+        )
+        zoom_out_btn.setToolTip('تصغير الصورة')
+        zoom_layout.addWidget(zoom_out_btn)
+        
+        # مؤشر نسبة التكبير
+        self.zoom_label = QLabel('100%')
+        self.zoom_label.setStyleSheet(
+            "font-weight: bold; color: #2c3e50; padding: 5px; min-width: 50px;"
+        )
+        self.zoom_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        zoom_layout.addWidget(self.zoom_label)
+        
+        # زر التكبير
+        zoom_in_btn = QPushButton('🔍+')
+        zoom_in_btn.clicked.connect(self.zoom_in)
+        zoom_in_btn.setStyleSheet(
+            "QPushButton { padding: 8px 12px; font-size: 14px; font-weight: bold; "
+            "background-color: #27ae60; color: white; border: none; border-radius: 4px; }"
+            "QPushButton:hover { background-color: #229954; }"
+        )
+        zoom_in_btn.setToolTip('تكبير الصورة')
+        zoom_layout.addWidget(zoom_in_btn)
+        
+        zoom_layout.addStretch()
+        
+        # زر ملء الشاشة
+        fit_window_btn = QPushButton('📐 ملء النافذة')
+        fit_window_btn.clicked.connect(self.fit_to_window)
+        fit_window_btn.setStyleSheet(
+            "QPushButton { padding: 8px 12px; font-size: 11px; font-weight: bold; "
+            "background-color: #3498db; color: white; border: none; border-radius: 4px; }"
+            "QPushButton:hover { background-color: #2980b9; }"
+        )
+        fit_window_btn.setToolTip('ملء النافذة')
+        zoom_layout.addWidget(fit_window_btn)
+        
+        # زر الحجم الأصلي
+        actual_size_btn = QPushButton('📏 الحجم الأصلي')
+        actual_size_btn.clicked.connect(self.actual_size)
+        actual_size_btn.setStyleSheet(
+            "QPushButton { padding: 8px 12px; font-size: 11px; font-weight: bold; "
+            "background-color: #9b59b6; color: white; border: none; border-radius: 4px; }"
+            "QPushButton:hover { background-color: #8e44ad; }"
+        )
+        actual_size_btn.setToolTip('الحجم الأصلي 100%')
+        zoom_layout.addWidget(actual_size_btn)
+        
+        zoom_toolbar.setLayout(zoom_layout)
+        right_layout.addWidget(zoom_toolbar)
+        
+        # منطقة عرض الصورة مع تحسين استخدام المساحة
         self.image_label = QLabel()
         self.image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.image_label.setStyleSheet(
             f"background-color: {COLORS.BACKGROUND_WHITE}; "
-            "border: 2px dashed #bdc3c7; border-radius: 8px; "
-            "min-height: 400px;"
+            "border: 1px solid #bdc3c7; border-radius: 8px; "
+            "min-height: 300px;"
         )
+        self.image_label.setScaledContents(False)  # للتحكم في تحجيم الصورة يدوياً
         
         if not self.image_paths:
             self.image_label.setText("❌ لا توجد صور متاحة")
@@ -365,70 +436,192 @@ class DocumentViewerWindow(QMainWindow):
                 "color: #e74c3c; font-size: 16px; font-weight: bold;"
             )
         
-        # تضمين الصورة في منطقة التمرير
-        scroll_area = QScrollArea()
-        scroll_area.setWidget(self.image_label)
-        scroll_area.setWidgetResizable(True)
-        scroll_area.setStyleSheet(
+        # تضمين الصورة في منطقة التمرير مع تحسين المساحة
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setWidget(self.image_label)
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.scroll_area.setSizePolicy(
+            self.scroll_area.sizePolicy().Expanding, 
+            self.scroll_area.sizePolicy().Expanding
+        )
+        self.scroll_area.setStyleSheet(
             "QScrollArea { border: none; background-color: transparent; }"
             "QScrollBar:vertical { width: 12px; border-radius: 6px; background-color: #f1f2f6; }"
-            "QScrollBar::handle:vertical { background-color: #3498db; border-radius: 6px; }"
+            "QScrollBar::handle:vertical { background-color: #3498db; border-radius: 6px; min-height: 20px; }"
             "QScrollBar::handle:vertical:hover { background-color: #2980b9; }"
+            "QScrollBar:horizontal { height: 12px; border-radius: 6px; background-color: #f1f2f6; }"
+            "QScrollBar::handle:horizontal { background-color: #3498db; border-radius: 6px; min-width: 20px; }"
+            "QScrollBar::handle:horizontal:hover { background-color: #2980b9; }"
         )
         
-        right_layout.addWidget(scroll_area)
+        right_layout.addWidget(self.scroll_area)
         right_panel.setLayout(right_layout)
         
-        # إضافة الألواح للتخطيط الرئيسي (اليسار يأخذ مساحة ثابتة، اليمين يأخذ الباقي)
-        main_layout.addWidget(left_panel, 0)  # مساحة ثابتة
-        main_layout.addWidget(right_panel, 1)  # مساحة مرنة
+        # توزيع محسن للمساحة - اليسار 30% واليمين 70%
+        main_layout.addWidget(left_panel, 3)  # 30% من المساحة
+        main_layout.addWidget(right_panel, 7)  # 70% من المساحة
         
         central_widget.setLayout(main_layout)
         
-        # عرض الصورة الأولى
+        # عرض الصورة الأولى مع تأخير قصير لضمان حساب المساحة بشكل صحيح
         if self.image_paths:
-            self.display_image(0)
+            # استخدام QTimer لضمان رسم النافذة أولاً
+            from PyQt6.QtCore import QTimer
+            QTimer.singleShot(100, lambda: self.display_image(0))
     
     def display_image(self, index):
-        """عرض الصورة في الموضع المحدد بأداء محسن"""
+        """عرض الصورة في الموضع المحدد مع دعم التكبير والتصغير"""
         if 0 <= index < len(self.image_paths):
             self.current_page = index
+            image_path = self.image_paths[index]
             
-            # استخدام الـ cache للحصول على الصورة المحجمة
-            scaled_pixmap = self.get_cached_image(index)
-            
-            if scaled_pixmap is None:
-                # عرض رسالة خطأ إذا فشل تحميل الصورة
-                image_path = self.image_paths[index]
-                if not os.path.exists(image_path):
-                    self.image_label.setText(f"❌ الصورة غير موجودة:\n{image_path}")
-                else:
-                    self.image_label.setText(f"❌ فشل تحميل الصورة:\n{image_path}")
+            # تحميل الصورة الأصلية
+            if not os.path.exists(image_path):
+                self.image_label.setText(f"❌ الصورة غير موجودة:\n{os.path.basename(image_path)}")
+                self.image_label.setStyleSheet(
+                    f"background-color: {COLORS.BACKGROUND_WHITE}; "
+                    "border: 2px dashed #e74c3c; border-radius: 8px; "
+                    "color: #e74c3c; font-size: 16px; font-weight: bold;"
+                )
                 return
             
-            # عرض الصورة المحجمة
-            self.image_label.setPixmap(scaled_pixmap)
+            # تحميل الصورة الأصلية
+            self.original_pixmap = QPixmap(image_path)
             
-            # تحديث شريط التمرير بسرعة
-            self.page_spin.blockSignals(True)
-            self.page_spin.setValue(index + 1)
-            self.page_spin.blockSignals(False)
+            if self.original_pixmap.isNull():
+                self.image_label.setText(f"❌ فشل تحميل الصورة:\n{os.path.basename(image_path)}")
+                self.image_label.setStyleSheet(
+                    f"background-color: {COLORS.BACKGROUND_WHITE}; "
+                    "border: 2px dashed #e74c3c; border-radius: 8px; "
+                    "color: #e74c3c; font-size: 16px; font-weight: bold;"
+                )
+                return
             
-            # تحديث اختيار الصورة في القائمة بسرعة (منع التداخل)
-            self._programmatic_update = True
-            self.image_list.blockSignals(True)
-            self.image_list.clearSelection()
-            if self.image_list.count() > index:
-                self.image_list.item(index).setSelected(True)
-                self.image_list.setCurrentRow(index)
-            self.image_list.blockSignals(False)
-            self._programmatic_update = False
+            # إعادة تعيين التكبير وعرض الصورة بحجم مناسب للنافذة
+            self.zoom_factor = 1.0
+            
+            # حساب الحجم المناسب للعرض الأولي
+            available_size = self.scroll_area.viewport().size()
+            if available_size.width() > 100 and available_size.height() > 100:
+                # حساب نسبة مبدئية للتكبير بحيث تملأ النافذة بشكل مناسب
+                scale_x = (available_size.width() - 40) / self.original_pixmap.width()
+                scale_y = (available_size.height() - 100) / self.original_pixmap.height()
+                initial_scale = min(scale_x, scale_y, 1.0)  # لا تكبر أكثر من الحجم الأصلي ولكن قد تصغر
+                
+                if initial_scale > 0.1:  # تجنب التصغير المفرط
+                    self.zoom_factor = initial_scale
+            
+            self.apply_zoom()
+            
+            # تحديث عناصر التحكم
+            self._update_controls(index)
             
             # تحديث معلومات الصورة
             self._update_current_image_info(index)
             
-            # تحميل الصورة التالية والسابقة في الخلفية
+            # تحديث مؤشر التكبير
+            self.update_zoom_label()
+            
+            # إصلاح تصميم الصورة
+            self.image_label.setStyleSheet(
+                "background-color: white; "
+                "border: 1px solid #bdc3c7; border-radius: 4px;"
+            )
+            
+            # تحميل الصور المجاورة في الخلفية
             self._preload_adjacent_images(index)
+    
+    def _update_controls(self, index):
+        """تحديث عناصر التحكم بالصفحة"""
+        # تحديث شريط التمرير
+        self.page_spin.blockSignals(True)
+        self.page_spin.setValue(index + 1)
+        self.page_spin.blockSignals(False)
+        
+        # تحديث اختيار الصورة في القائمة
+        self._programmatic_update = True
+        self.image_list.blockSignals(True)
+        self.image_list.clearSelection()
+        if self.image_list.count() > index:
+            self.image_list.item(index).setSelected(True)
+            self.image_list.setCurrentRow(index)
+        self.image_list.blockSignals(False)
+        self._programmatic_update = False
+        
+        # تحديث أزرار التنقل
+        self.prev_btn.setEnabled(index > 0)
+        self.next_btn.setEnabled(index < len(self.image_paths) - 1)
+    
+    def zoom_in(self):
+        """تكبير الصورة"""
+        if self.original_pixmap:
+            self.zoom_factor = min(self.zoom_factor * 1.25, 5.0)  # حد أقصى 500%
+            self.apply_zoom()
+    
+    def zoom_out(self):
+        """تصغير الصورة"""
+        if self.original_pixmap:
+            self.zoom_factor = max(self.zoom_factor / 1.25, 0.1)  # حد أدنى 10%
+            self.apply_zoom()
+    
+    def fit_to_window(self):
+        """ملء النافذة بالصورة مع حساب أفضل للمساحة المتاحة"""
+        if self.original_pixmap:
+            # حساب المساحة المتاحة الفعلية مع مراعاة شريط الأدوات
+            available_size = self.scroll_area.viewport().size()
+            
+            # طرح مساحة شريط الأدوات والهوامش
+            toolbar_height = 60  # تقدير ارتفاع شريط الأدوات
+            margins = 40  # هوامش إضافية
+            
+            available_size.setWidth(available_size.width() - margins)
+            available_size.setHeight(available_size.height() - toolbar_height - margins)
+            
+            # التأكد من أن المساحة المتاحة صالحة
+            if available_size.width() <= 0 or available_size.height() <= 0:
+                # استخدام قيم افتراضية محسنة
+                available_size.setWidth(700)
+                available_size.setHeight(500)
+            
+            # حساب نسبة التكبير لملء النافذة
+            scale_x = available_size.width() / self.original_pixmap.width()
+            scale_y = available_size.height() / self.original_pixmap.height()
+            self.zoom_factor = min(scale_x, scale_y, 2.0)  # حد أقصى 200%
+            
+            self.apply_zoom()
+    
+    def actual_size(self):
+        """الحجم الأصلي 100%"""
+        if self.original_pixmap:
+            self.zoom_factor = 1.0
+            self.apply_zoom()
+    
+    def apply_zoom(self):
+        """تطبيق التكبير على الصورة"""
+        if self.original_pixmap:
+            # حساب الحجم الجديد
+            new_size = self.original_pixmap.size() * self.zoom_factor
+            
+            # تطبيق التكبير مع الحفاظ على الجودة
+            scaled_pixmap = self.original_pixmap.scaled(
+                new_size, 
+                Qt.AspectRatioMode.KeepAspectRatio, 
+                Qt.TransformationMode.SmoothTransformation
+            )
+            
+            # عرض الصورة
+            self.image_label.setPixmap(scaled_pixmap)
+            self.image_label.resize(scaled_pixmap.size())
+            
+            # تحديث مؤشر التكبير
+            self.update_zoom_label()
+    
+    def update_zoom_label(self):
+        """تحديث مؤشر نسبة التكبير"""
+        if hasattr(self, 'zoom_label'):
+            percentage = int(self.zoom_factor * 100)
+            self.zoom_label.setText(f'{percentage}%')
     
     def _preload_adjacent_images(self, current_index):
         """تحميل الصور المجاورة في الخلفية لتحسين التنقل"""
@@ -787,6 +980,22 @@ class DocumentViewerWindow(QMainWindow):
                 # إذا لم يكن التحديث برمجياً، يمكن عرض الصورة أيضاً كاحتياط
                 index = self.image_list.row(selected_items[0])
                 self.display_image(index)
+    
+    def resizeEvent(self, event):
+        """استجابة لتغيير حجم النافذة لإعادة تحجيم الصورة بما يناسب المساحة الجديدة"""
+        super().resizeEvent(event)
+        
+        # إعادة تطبيق الزوم إذا كانت هناك صورة معروضة حالياً
+        if hasattr(self, 'original_pixmap') and self.original_pixmap:
+            # التحقق من وضع العرض الحالي ومحاولة المحافظة عليه
+            if hasattr(self, 'zoom_factor') and self.zoom_factor > 0:
+                # إذا كانت الصورة في وضع "ملء النافذة" (نسبة صغيرة)، أعد حسابها
+                if self.zoom_factor < 1.0:
+                    # إعادة حساب الملء للنافذة الجديدة
+                    self.fit_to_window()
+                else:
+                    # الحفاظ على الزوم الحالي
+                    self.apply_zoom()
     
     def cleanup_cache(self):
         """تنظيف الـ cache لتوفير الذاكرة"""
