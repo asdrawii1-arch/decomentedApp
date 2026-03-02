@@ -774,31 +774,51 @@ class DocumentViewerWindow(QMainWindow):
             if not painter.begin(printer):
                 QMessageBox.critical(self, 'خطأ', 'فشل بدء الطباعة')
                 return
-            
-            # حجم الصفحة بالبكسل
-            page_rect = printer.pageRect(QPrinter.Unit.DevicePixel)
+            # احصل على مستطيل الصفحة بوحدات الجهاز؛ تحقّق من القيم وحسّن التحجيم
+            try:
+                page_rect = printer.pageRect()  # الوحدة الافتراضية تعمل عادةً بشكل جيد
+            except Exception:
+                page_rect = printer.pageRect(QPrinter.Unit.DevicePixel)
+
             print_count = 0
-            
+
             for i, image_path in enumerate(self.image_paths):
-                # تحميل الصورة
                 pixmap = QPixmap(image_path)
                 if pixmap.isNull():
                     continue
-                
-                # رسم الصورة على الصفحة
-                painter.drawPixmap(
-                    page_rect.toRect(),
-                    pixmap.scaled(
-                        page_rect.width(),
-                        page_rect.height(),
-                        Qt.AspectRatioMode.KeepAspectRatio,
-                        Qt.TransformationMode.SmoothTransformation
-                    )
+
+                # احسب حجم الهدف مع الحفاظ على نسبة العرض للارتفاع
+                from PyQt6.QtCore import QSize as _QSize
+                page_size = _QSize(int(page_rect.width()), int(page_rect.height()))
+                target_size = pixmap.size().scaled(
+                    page_size,
+                    Qt.AspectRatioMode.KeepAspectRatio
                 )
-                
+
+                # في بعض الطابعات القيم قد تكون صفرية - تعامل مع هذه الحالة
+                if target_size.width() <= 0 or target_size.height() <= 0:
+                    # حاول استخدام أبعاد الصورة الأصلية كاحتياط
+                    target_size = pixmap.size()
+                    if target_size.width() <= 0 or target_size.height() <= 0:
+                        continue
+
+                # محاذاة الصورة في منتصف الصفحة
+                x = int((page_rect.width() - target_size.width()) / 2)
+                y = int((page_rect.height() - target_size.height()) / 2)
+                target_rect = page_rect.toRect()
+                target_rect.setX(x)
+                target_rect.setY(y)
+                target_rect.setWidth(target_size.width())
+                target_rect.setHeight(target_size.height())
+
+                # ارسم الصورة محجمة إلى الحجم المحسوب
+                painter.drawPixmap(
+                    target_rect,
+                    pixmap
+                )
+
                 print_count += 1
-                
-                # الصفحة التالية (إن كانت هناك صور أخرى)
+
                 if i < len(self.image_paths) - 1:
                     printer.newPage()
             
