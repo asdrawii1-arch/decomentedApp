@@ -1,3 +1,4 @@
-take the subject from the ocr scanner
-fix read ocr issue
-styling fixes
+1- handle default select , add background for select all
+2-show document , dupleacted info(if main info exist hide the orange one)
+3-fix responsivity issue, make it one size 
+4- try to extract the info, if there is no info , always add the file and keep the untraccked info empty
