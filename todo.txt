@@ -1,4 +1,5 @@
-1- handle default select , add background for select all
-2-show document , dupleacted info(if main info exist hide the orange one)
+1-select all not working ,when selecting all and then hover to any place, the select is gone, handle default select , add background color for select all, the styles of checkbox is bad, make them better 
+2-show document , dupleacted info(if main info exist hide the orange color ones)
 3-fix responsivity issue, make it one size 
 4- try to extract the info, if there is no info , always add the file and keep the untraccked info empty
+5-add backup for the data. there will be manual backup and automatic backup(evrey weekend), the backup folder must be at documnet and ziped folder, I can import the backup and it will be restored to the app

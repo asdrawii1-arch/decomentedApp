@@ -43,6 +43,7 @@ from app.constants import COLORS, FONT_SIZES, DIMENSIONS, ICONS
 from app.image_manager import ImageManager
 from app.document_viewer import DocumentViewerWindow
 from app.helpers import ValidationHelper, DateHelper, ExportHelper, DatabaseBackupHelper
+from app.backup_manager import BackupManager
 
 # استيراد نوافذ الحوار من الوحدة الجديدة
 from app.dialogs import (
@@ -75,7 +76,8 @@ class MainWindow(QMainWindow):
         self.image_manager = ImageManager('documents')
         self.current_year = None  # السنة المختارة حالياً (None = جميع السنوات)
         self.setWindowTitle('برنامج أرشفة الكتب الرسمية')
-        self.setGeometry(0, 0, 1200, 700)
+        self.setMinimumSize(900, 500)
+        self.showMaximized()
         
         # تطبيق الأسلوب
         self.setStyleSheet(MAIN_STYLESHEET)
@@ -84,6 +86,10 @@ class MainWindow(QMainWindow):
         # تحديث قائمة السنوات قبل تحميل الوثائق
         self.refresh_years()
         self.load_documents()
+        
+        # تهيئة نظام النسخ الاحتياطي والتحقق من الحاجة للنسخ التلقائي
+        self.backup_manager = BackupManager()
+        self.check_auto_backup()
     
     def init_ui(self):
         """إنشاء واجهة المستخدم"""
@@ -198,10 +204,38 @@ class MainWindow(QMainWindow):
         
         select_all_btn = QPushButton('✓ تحديد الكل')
         select_all_btn.clicked.connect(self.select_all_documents)
+        select_all_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLORS.ACCENT};
+                color: {COLORS.TEXT_WHITE};
+                font-weight: bold;
+                padding: 8px 14px;
+                border-radius: 6px;
+                border: none;
+                font-size: {FONT_SIZES.BUTTON}px;
+            }}
+            QPushButton:hover {{
+                background-color: {COLORS.LINK};
+            }}
+        """)
         toolbar_layout.addWidget(select_all_btn)
         
         deselect_all_btn = QPushButton('✗ إلغاء التحديد')
         deselect_all_btn.clicked.connect(self.deselect_all_documents)
+        deselect_all_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLORS.SECONDARY_DARK};
+                color: {COLORS.TEXT_PRIMARY};
+                font-weight: bold;
+                padding: 8px 14px;
+                border-radius: 6px;
+                border: 1px solid {COLORS.BORDER_DARK};
+                font-size: {FONT_SIZES.BUTTON}px;
+            }}
+            QPushButton:hover {{
+                background-color: {COLORS.BORDER_DARK};
+            }}
+        """)
         toolbar_layout.addWidget(deselect_all_btn)
         
         delete_selected_btn = QPushButton('🗑️ حذف المحددة')
@@ -211,6 +245,43 @@ class MainWindow(QMainWindow):
         refresh_btn = QPushButton('🔄 تحديث')
         refresh_btn.clicked.connect(self.load_documents)
         toolbar_layout.addWidget(refresh_btn)
+        
+        # أزرار النسخ الاحتياطي
+        backup_btn = QPushButton('💾 نسخ احتياطي')
+        backup_btn.clicked.connect(self.manual_backup)
+        backup_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLORS.BUTTON_GREEN};
+                color: {COLORS.TEXT_WHITE};
+                font-weight: bold;
+                padding: 8px 12px;
+                border-radius: 6px;
+                border: none;
+                font-size: {FONT_SIZES.BUTTON}px;
+            }}
+            QPushButton:hover {{
+                background-color: #047857;
+            }}
+        """)
+        toolbar_layout.addWidget(backup_btn)
+        
+        restore_btn = QPushButton('📥 استعادة')
+        restore_btn.clicked.connect(self.restore_backup_action)
+        restore_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLORS.WARNING};
+                color: {COLORS.TEXT_WHITE};
+                font-weight: bold;
+                padding: 8px 12px;
+                border-radius: 6px;
+                border: none;
+                font-size: {FONT_SIZES.BUTTON}px;
+            }}
+            QPushButton:hover {{
+                background-color: #b45309;
+            }}
+        """)
+        toolbar_layout.addWidget(restore_btn)
         main_layout.addLayout(toolbar_layout)
 
         # محتوى رئيسي: جدول الوثائق بعرض كامل
@@ -222,16 +293,27 @@ class MainWindow(QMainWindow):
         self.documents_table.setHorizontalHeaderLabels([
             'ت', '☑', 'رقم الوثيقة', 'التاريخ', 'المضمون', 'جهة الإصدار', 'التصنيف', 'المادة القانونية', '📷 الصور'
         ])
-        # تحسين عرض الأعمدة مع إضافة عمود التسلسل
-        self.documents_table.setColumnWidth(0, 60)   # عمود التسلسل
-        self.documents_table.setColumnWidth(1, 50)   # Checkbox column
-        self.documents_table.setColumnWidth(2, 140)  # رقم الوثيقة
-        self.documents_table.setColumnWidth(3, 120)  # التاريخ
-        self.documents_table.setColumnWidth(4, 220)  # المضمون
-        self.documents_table.setColumnWidth(5, 160)  # جهة الإصدار
-        self.documents_table.setColumnWidth(6, 110)  # التصنيف
-        self.documents_table.setColumnWidth(7, 190)  # المادة القانونية
-        self.documents_table.setColumnWidth(8, 90)   # عدد الصور
+        # تحسين عرض الأعمدة - responsive columns
+        header = self.documents_table.horizontalHeader()
+        header.setMinimumSectionSize(40)
+        header.setSectionResizeMode(0, header.ResizeMode.Fixed)     # ت
+        header.setSectionResizeMode(1, header.ResizeMode.Fixed)     # ☑
+        header.setSectionResizeMode(2, header.ResizeMode.Interactive)  # رقم الوثيقة
+        header.setSectionResizeMode(3, header.ResizeMode.Interactive)  # التاريخ
+        header.setSectionResizeMode(4, header.ResizeMode.Stretch)      # المضمون (stretches)
+        header.setSectionResizeMode(5, header.ResizeMode.Interactive)  # جهة الإصدار
+        header.setSectionResizeMode(6, header.ResizeMode.Interactive)  # التصنيف
+        header.setSectionResizeMode(7, header.ResizeMode.Interactive)  # المادة القانونية
+        header.setSectionResizeMode(8, header.ResizeMode.Fixed)     # الصور
+        self.documents_table.setColumnWidth(0, 50)    # ت
+        self.documents_table.setColumnWidth(1, 45)    # Checkbox
+        self.documents_table.setColumnWidth(2, 140)   # رقم الوثيقة
+        self.documents_table.setColumnWidth(3, 110)   # التاريخ
+        # column 4 stretches automatically
+        self.documents_table.setColumnWidth(5, 160)   # جهة الإصدار
+        self.documents_table.setColumnWidth(6, 100)   # التصنيف
+        self.documents_table.setColumnWidth(7, 170)   # المادة القانونية
+        self.documents_table.setColumnWidth(8, 70)    # عدد الصور
         self.documents_table.setAlternatingRowColors(True)
         self.documents_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.documents_table.setSelectionMode(QTableWidget.SelectionMode.ExtendedSelection)
@@ -273,7 +355,7 @@ class MainWindow(QMainWindow):
         # تحسين ارتفاع الصفوف لقابلية قراءة أفضل
         self.documents_table.setRowHeight(0, 35)  # زيادة ارتفاع الصفوف
         
-        self.documents_table.selectionModel().selectionChanged.connect(self.on_row_selection_changed)
+        # Checkbox state is independent of row selection (no selectionChanged binding)
         
         # ضع الجدول داخل تخطيط عمودي (للسماح بعناصر إضافية إن لزم)
         right_layout = QVBoxLayout()
@@ -320,19 +402,31 @@ class MainWindow(QMainWindow):
             # Checkbox column (عمود 1) - مع تحسين المظهر
             checkbox = QCheckBox()
             checkbox.setStyleSheet(f"""
+                QCheckBox {{
+                    margin-left: 12px;
+                }}
                 QCheckBox::indicator {{
-                    width: 20px;
-                    height: 20px;
+                    width: 22px;
+                    height: 22px;
                 }}
                 QCheckBox::indicator:unchecked {{
                     background-color: {COLORS.BACKGROUND_WHITE};
                     border: 2px solid {COLORS.BORDER_DARK};
-                    border-radius: 4px;
+                    border-radius: 5px;
+                }}
+                QCheckBox::indicator:unchecked:hover {{
+                    border-color: {COLORS.ACCENT};
+                    background-color: {COLORS.HOVER_BG};
                 }}
                 QCheckBox::indicator:checked {{
-                    background-color: {COLORS.SUCCESS};
-                    border: 2px solid {COLORS.SUCCESS};
-                    border-radius: 4px;
+                    background-color: {COLORS.ACCENT};
+                    border: 2px solid {COLORS.ACCENT};
+                    border-radius: 5px;
+                    image: none;
+                }}
+                QCheckBox::indicator:checked:hover {{
+                    background-color: {COLORS.LINK};
+                    border-color: {COLORS.LINK};
                 }}
             """)
             checkbox.stateChanged.connect(lambda state, row=row: self.on_checkbox_changed(row, state))
@@ -710,92 +804,25 @@ class MainWindow(QMainWindow):
                         'sequence': parsed.get('sequence')
                     })
                 else:
-                    # الملفات التي لم يتم التعرف على صيغتها
-                    # لكن إذا كانت تحتوي على ص أو و، أضفها بجهة الإصدار الافتراضية
-                    if default_dept:
-                        unrecognized.append((filename, default_dept))
-                    else:
-                        unrecognized.append((filename, None))
-            
-            # إذا كانت هناك ملفات غير معترف بها، اسأل المستخدم
-            if unrecognized:
-                only_with_dept = [f for f, d in unrecognized if d is not None]
-                without_dept = [f for f, d in unrecognized if d is None]
-                
-                msg = f"عدد الملفات غير المعترف بصيغتها: {len(unrecognized)}\n\n"
-                
-                if only_with_dept:
-                    msg += f"ملفات ستُضاف بجهة الإصدار: {only_with_dept[0].split()[0] if 'ص' in only_with_dept[0] else 'قسم أمن الأفراد الأنبار'} ({len(only_with_dept)})\n"
-                
-                if without_dept:
-                    msg += f"ملفات بدون جهة إصدار ({len(without_dept)})\n\n"
-                    msg += "هل تريد إضافة جميع الملفات؟\n\n"
-                    msg += "أول 10 ملفات:\n"
-                    for f, _ in unrecognized[:10]:
-                        msg += f"• {f}\n"
-                
-                reply = QMessageBox.question(self, 'ملفات غير معترف بها', msg)
-                
-                if reply == QMessageBox.StandardButton.Yes:
-                    # أنشئ وثائق للملفات غير المعترف بها
-                    
-                    # 1. ملفات بجهة الإصدار المحددة
-                    dept_groups = {}
-                    for filename, dept in unrecognized:
-                        if dept:
-                            if dept not in dept_groups:
-                                dept_groups[dept] = []
-                            dept_groups[dept].append(filename)
-                    
-                    for dept, filenames in dept_groups.items():
-                        doc_key = f"unrecognized_{dept}"
-                        documents_to_add[doc_key] = {
-                            'data': {
-                                'doc_name': f'ملفات مستورة عن {dept}',
-                                'doc_date': '',
-                                'doc_title': '',
-                                'issuing_dept': dept,
-                                'doc_classification': '',
-                                'legal_paragraph': ''
-                            },
-                            'images': []
-                        }
-                        
-                        for filename in filenames:
-                            for file_path in files:
-                                if os.path.basename(file_path) == filename:
-                                    documents_to_add[doc_key]['images'].append({
-                                        'path': file_path,
-                                        'filename': filename,
-                                        'sequence': None
-                                    })
-                                    break
-                    
-                    # 2. ملفات بدون جهة إصدار
-                    no_dept_files = [f for f, d in unrecognized if d is None]
-                    if no_dept_files:
-                        doc_key = 'unrecognized_files_no_dept'
-                        documents_to_add[doc_key] = {
-                            'data': {
-                                'doc_name': 'ملفات مستورة (بدون معلومات)',
-                                'doc_date': '',
-                                'doc_title': '',
-                                'issuing_dept': '',
-                                'doc_classification': '',
-                                'legal_paragraph': ''
-                            },
-                            'images': []
-                        }
-                        
-                        for filename in no_dept_files:
-                            for file_path in files:
-                                if os.path.basename(file_path) == filename:
-                                    documents_to_add[doc_key]['images'].append({
-                                        'path': file_path,
-                                        'filename': filename,
-                                        'sequence': None
-                                    })
-                                    break
+                    # Always add unrecognized files - each as its own document with empty/default info
+                    file_stem = os.path.splitext(filename)[0]
+                    doc_key = f"unrecognized_{filename}"
+                    dept = default_dept or ''
+                    documents_to_add[doc_key] = {
+                        'data': {
+                            'doc_name': file_stem,
+                            'doc_date': '',
+                            'doc_title': '',
+                            'issuing_dept': dept,
+                            'doc_classification': '',
+                            'legal_paragraph': ''
+                        },
+                        'images': [{
+                            'path': file_path,
+                            'filename': filename,
+                            'sequence': None
+                        }]
+                    }
             
             # حفظ الوثائق والصور في قاعدة البيانات
             # Calculate total images for progress
@@ -1053,12 +1080,12 @@ class MainWindow(QMainWindow):
     
     def open_destruction_form(self):
         """فتح نافذة استمارة إتلاف الوثائق"""
-        # الحصول على الوثائق المحددة
+        # الحصول على الوثائق المحددة (checkbox at column 1, doc_id at column 2)
         selected_docs = []
         for row in range(self.documents_table.rowCount()):
-            checkbox = self.documents_table.cellWidget(row, 0)
+            checkbox = self.documents_table.cellWidget(row, 1)
             if checkbox and checkbox.isChecked():
-                doc_id_item = self.documents_table.item(row, 1)
+                doc_id_item = self.documents_table.item(row, 2)
                 if doc_id_item:
                     doc_id = doc_id_item.data(Qt.ItemDataRole.UserRole)
                     if doc_id:
@@ -1072,27 +1099,19 @@ class MainWindow(QMainWindow):
     
     def select_all_documents(self):
         """تحديد جميع الوثائق"""
-        # تحديد جميع الصفوف في الجدول
-        self.documents_table.selectAll()
-        
-        # تحديد جميع checkboxes
         for row in range(self.documents_table.rowCount()):
-            checkbox = self.documents_table.cellWidget(row, 1)  # Column 1 now has checkbox
+            checkbox = self.documents_table.cellWidget(row, 1)
             if checkbox:
-                checkbox.blockSignals(True)  # منع إرسال signals تجنباً للتداخل
+                checkbox.blockSignals(True)
                 checkbox.setChecked(True)
                 checkbox.blockSignals(False)
     
     def deselect_all_documents(self):
         """إلغاء تحديد جميع الوثائق"""
-        # إلغاء تحديد جميع الصفوف في الجدول
-        self.documents_table.clearSelection()
-        
-        # إلغاء تحديد جميع checkboxes
         for row in range(self.documents_table.rowCount()):
-            checkbox = self.documents_table.cellWidget(row, 1)  # Column 1 now has checkbox
+            checkbox = self.documents_table.cellWidget(row, 1)
             if checkbox:
-                checkbox.blockSignals(True)  # منع إرسال signals تجنباً للتداخل
+                checkbox.blockSignals(True)
                 checkbox.setChecked(False)
                 checkbox.blockSignals(False)
     
@@ -1298,39 +1317,81 @@ class MainWindow(QMainWindow):
         # Re-enable updates
         self.documents_table.setUpdatesEnabled(True)
     
-    def on_checkbox_changed(self, row, state):
-        """Handle checkbox state changes"""
-        # تحديث تحديد الصف في الجدول وفقاً لحالة checkbox
-        if state == Qt.CheckState.Checked.value:
-            # إضافة الصف للتحديد
-            self.documents_table.selectRow(row)
-        else:
-            # إزالة تحديد الصف المحدد
-            selection_model = self.documents_table.selectionModel()
-            index = self.documents_table.model().index(row, 1)  # Column 1 now has checkbox
-            selection_model.select(index, selection_model.SelectionFlag.Deselect | selection_model.SelectionFlag.Rows)
+    def check_auto_backup(self):
+        """التحقق من الحاجة للنسخ الاحتياطي التلقائي (كل أسبوع)"""
+        try:
+            if self.backup_manager.should_auto_backup():
+                success, msg, zip_path = self.backup_manager.create_backup(
+                    self.db.db_path,
+                    self.image_manager.storage_dir
+                )
+                if success:
+                    print(f"[AUTO BACKUP] ✅ تم إنشاء نسخة احتياطية تلقائية: {zip_path}")
+                else:
+                    print(f"[AUTO BACKUP] ❌ فشل النسخ التلقائي: {msg}")
+        except Exception as e:
+            print(f"[AUTO BACKUP] خطأ: {str(e)}")
     
-    def on_row_selection_changed(self, selected, deselected):
-        """Handle row selection changes"""
-        # تحديث checkboxes للصفوف المحددة
-        selected_rows = self.documents_table.selectionModel().selectedRows()
+    def manual_backup(self):
+        """إنشاء نسخة احتياطية يدوية"""
+        reply = QMessageBox.question(
+            self, 'نسخ احتياطي',
+            '💾 هل تريد إنشاء نسخة احتياطية الآن؟\n\n'
+            f'سيتم حفظها في:\n{self.backup_manager.backup_dir}',
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
         
-        # أولاً، امسح جميع checkboxes
-        for row in range(self.documents_table.rowCount()):
-            checkbox = self.documents_table.cellWidget(row, 1)  # Column 1 now has checkbox
-            if checkbox:
-                checkbox.blockSignals(True)
-                checkbox.setChecked(False)
-                checkbox.blockSignals(False)
+        if reply == QMessageBox.StandardButton.Yes:
+            success, msg, zip_path = self.backup_manager.create_backup(
+                self.db.db_path,
+                self.image_manager.storage_dir
+            )
+            
+            if success:
+                QMessageBox.information(self, 'نسخ احتياطي ✅', msg)
+            else:
+                QMessageBox.critical(self, 'خطأ', msg)
+    
+    def restore_backup_action(self):
+        """استعادة نسخة احتياطية من ملف ZIP"""
+        # عرض قائمة بالنسخ الاحتياطية المتاحة أو اختيار ملف
+        zip_path, _ = QFileDialog.getOpenFileName(
+            self,
+            'اختيار ملف النسخة الاحتياطية',
+            str(self.backup_manager.backup_dir),
+            'ملفات ZIP (*.zip)'
+        )
         
-        # ثم، حدد checkboxes للصفوف المختارة
-        for index in selected_rows:
-            row = index.row()
-            checkbox = self.documents_table.cellWidget(row, 1)  # Column 1 now has checkbox
-            if checkbox:
-                checkbox.blockSignals(True)
-                checkbox.setChecked(True)
-                checkbox.blockSignals(False)
+        if not zip_path:
+            return
+        
+        reply = QMessageBox.warning(
+            self, 'تأكيد الاستعادة',
+            '⚠️ استعادة النسخة الاحتياطية ستستبدل جميع البيانات الحالية!\n\n'
+            'سيتم إنشاء نسخة احتياطية من البيانات الحالية قبل الاستعادة.\n\n'
+            'هل تريد المتابعة؟',
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        
+        if reply == QMessageBox.StandardButton.Yes:
+            success, msg = self.backup_manager.restore_backup(
+                zip_path,
+                self.db.db_path,
+                self.image_manager.storage_dir
+            )
+            
+            if success:
+                QMessageBox.information(self, 'استعادة ✅', msg)
+                # إعادة تهيئة قاعدة البيانات
+                self.db = DatabaseManager('documents.db')
+                self.refresh_years()
+                self.load_documents()
+            else:
+                QMessageBox.critical(self, 'خطأ', msg)
+    
+    def on_checkbox_changed(self, row, state):
+        """Handle checkbox state changes - checkboxes are independent of row selection"""
+        pass  # Checkbox state is managed directly, no row selection sync needed
 
 
 def main():

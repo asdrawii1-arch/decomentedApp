@@ -674,20 +674,29 @@ class DocumentViewerWindow(QMainWindow):
         """تحديث معلومات الصورة/المرفق الحالي مع عرض معلومات الوثيقة"""
         total_pages = len(self.image_paths)
         
-        # إنشاء معلومات الوثيقة الأساسية بتصميم محسن ومضغوط
-        doc_info_html = ""
+        # استخراج بيانات الوثيقة الرئيسية
+        doc_name = ""
+        doc_date = ""
+        doc_title = ""
+        issuing_dept = ""
+        doc_classification = ""
+        
         if self.document_data and len(self.document_data) >= 5:
-            doc_name = self.document_data[1] if len(self.document_data) > 1 else "غير محدد"
-            doc_date = self.document_data[2] if len(self.document_data) > 2 else "غير محدد"  
-            doc_title = self.document_data[3] if len(self.document_data) > 3 else "غير محدد"
-            issuing_dept = self.document_data[4] if len(self.document_data) > 4 else "غير محدد"
-            
+            doc_name = self.document_data[1] if len(self.document_data) > 1 else ""
+            doc_date = self.document_data[2] if len(self.document_data) > 2 else ""
+            doc_title = self.document_data[3] if len(self.document_data) > 3 else ""
+            issuing_dept = self.document_data[4] if len(self.document_data) > 4 else ""
+            doc_classification = self.document_data[5] if len(self.document_data) > 5 else ""
+        
+        # إنشاء معلومات الوثيقة الأساسية
+        doc_info_html = ""
+        if doc_name or doc_date or doc_title or issuing_dept:
             doc_info_html = f"""
             <div style='background: linear-gradient(135deg, #3498db, #2980b9); padding: 6px; border-radius: 6px; margin-bottom: 6px;'>
                 <span style='color: #fff; font-size: 12px; font-weight: bold;'>📋 معلومات الوثيقة</span><br>
                 <span style='color: #000000; font-size: 12px; font-weight: 700;'>
-                🔢 <b>{doc_name}</b> • 📅 {doc_date}<br>
-                📝 {doc_title} • 🏢 {issuing_dept}
+                🔢 <b>{doc_name or 'غير محدد'}</b> • 📅 {doc_date or 'غير محدد'}<br>
+                📝 {doc_title or 'غير محدد'} • 🏢 {issuing_dept or 'غير محدد'}
                 </span>
             </div>
             """
@@ -697,23 +706,44 @@ class DocumentViewerWindow(QMainWindow):
             notes = img_data.get('notes', '')
             
             if index == 0:
-                # الصورة الأولى = الوثيقة الرئيسية
                 type_icon = "📄"
                 type_text = "الوثيقة الرئيسية"
             else:
-                # المرفقات
                 type_icon = "📎"
                 type_text = f"المرفق {index}"
             
-            # بناء النص بتنسيق أنيق ومضغوط
             header = f"<span style='font-size: 13px; color: #3498db;'>{type_icon} <b>{type_text}</b></span>"
             page_info = f"<span style='color: #bdc3c7; font-size: 11px;'>الصفحة {index + 1} من {total_pages}</span>"
             
             if notes:
-                # تحويل الملاحظات لتنسيق أفضل مع أيقونات مضغوطة
+                # تحليل الملاحظات واستبعاد الحقول المتطابقة مع الوثيقة الرئيسية
                 notes_parts = notes.split(' | ')
                 notes_html = ""
                 for part in notes_parts:
+                    # استخراج القيمة من الحقل (مثل "رقم: 65" -> "65")
+                    part_value = part.split(':', 1)[1].strip() if ':' in part else part.strip()
+                    
+                    # تحقق مما إذا كانت القيمة مطابقة لبيانات الوثيقة الرئيسية
+                    is_duplicate = False
+                    if part.startswith('رقم:'):
+                        # مقارنة مع اسم الوثيقة (قد يحتوي على "رقم في تاريخ")
+                        is_duplicate = (part_value == doc_name or 
+                                       part_value in doc_name or 
+                                       doc_name.startswith(part_value))
+                    elif part.startswith('تاريخ:'):
+                        is_duplicate = (part_value == doc_date or part_value in doc_date)
+                    elif part.startswith('مضمون:'):
+                        is_duplicate = (part_value == doc_title)
+                    elif part.startswith('جهة:'):
+                        is_duplicate = (part_value == issuing_dept)
+                    elif part.startswith('تصنيف:'):
+                        is_duplicate = (part_value == doc_classification)
+                    
+                    # تخطي الحقول المتطابقة
+                    if is_duplicate:
+                        continue
+                    
+                    # عرض الحقول غير المتطابقة فقط
                     if part.startswith('رقم:'):
                         notes_html += f"<br><span style='font-size: 11px; color: #e74c3c;'>🔢 {part}</span>"
                     elif part.startswith('تاريخ:'):
@@ -729,7 +759,11 @@ class DocumentViewerWindow(QMainWindow):
                     else:
                         notes_html += f"<br><span style='font-size: 11px; color: #95a5a6;'>• {part}</span>"
                 
-                info_text = f"{doc_info_html}{header} &nbsp;&nbsp; {page_info}{notes_html}"
+                if notes_html:
+                    info_text = f"{doc_info_html}{header} &nbsp;&nbsp; {page_info}{notes_html}"
+                else:
+                    # جميع الحقول متطابقة - لا تعرض قسم الملاحظات
+                    info_text = f"{doc_info_html}{header} &nbsp;&nbsp; {page_info}"
             else:
                 info_text = f"{doc_info_html}{header} &nbsp;&nbsp; {page_info}"
             
